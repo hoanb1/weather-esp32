@@ -137,6 +137,7 @@ void setupWiFi() {
   connectToStrongestNode();
 }
 
+
 /**
  * @brief Attempts to connect to the MQTT broker.
  */

@@ -21,6 +21,7 @@ typedef struct {
     uint8_t dustADCPin;    
     uint8_t mqADCPin;      
     
+    
     // --- MQ-135 CALIBRATION PARAMETERS (Float values must be stored as int/uint32 for NVS compatibility, 
     // but for simplicity in this AppConfig_t, we will assume float is supported or handled externally for now) ---
     float mq_rl_kohm;           // Load Resistor Resistance (kOhms)

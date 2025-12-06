@@ -11,6 +11,7 @@ AppConfig_t appConfig;
 
 Preferences preferences;
 
+
 // Default Configuration values
 const AppConfig_t defaultConfig = {
     // ... (Existing network and GPIO settings)

@@ -17,6 +17,7 @@ extern bool isWifiConnected;
 extern bool bmeInitialized;
 
 
+
 // ================= HARDWARE & SENSOR DECLARATIONS ==================
 
 extern WiFiClient espClient;

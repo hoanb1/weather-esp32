@@ -25,6 +25,7 @@ void setup() {
   Serial.begin(115200);
   Serial.println("\n--- Starting ESP32 Weather Station Setup ---");
 
+
   // 1. Configuration & Sensor Initialization
   loadConfig();  // Load configuration from NVS
 
