@@ -1,6 +1,6 @@
 // web_server.cpp
 
-#include <Arduino.h>            // Defines String, Serial, delay, ESP.restart, v.v.
+#include <Arduino.h>            // Defines String, Serial, delay, ESP.restart, etc.
 #include <WiFi.h>               // Defines WiFi
 #include <AsyncTCP.h>           // Required for ESPAsyncWebServer
 #include <ESPAsyncWebServer.h>  // Defines AsyncWebServer, AsyncWebServerRequest, ws, server, HTTP_GET, HTTP_POST
@@ -13,7 +13,7 @@
 #include "config.h"  // For AppConfig_t and appConfig
 #include "data.h"    // For global declarations like ws, server, onWsEvent, isWifiConnected
 
-void handleReboot(AsyncWebServerRequest * request) {
+void handleReboot(AsyncWebServerRequest *request) {
   request->send(200, "text/plain", "Rebooting device...");
   Serial.println("Web: Manual reboot requested. Restarting...");
   delay(1000);
@@ -24,7 +24,7 @@ void handleReboot(AsyncWebServerRequest * request) {
  * @brief Handles the /reset request by restoring factory settings and restarting.
  * This definition MUST be outside any other function.
  */
-void handleReset(AsyncWebServerRequest * request) {
+void handleReset(AsyncWebServerRequest *request) {
   // NOTE: resetConfig() must be defined/declared elsewhere (e.g., config_manager.cpp)
   request->send(200, "text/plain", "Factory settings restored. Rebooting...");
   Serial.println("Web: Factory reset requested. Erasing NVS and restarting...");
@@ -37,8 +37,15 @@ void handleReset(AsyncWebServerRequest * request) {
 String getSettingsPage() {
   // Use ArduinoJson to create a JSON string of the current config for JavaScript
   StaticJsonDocument<512> doc;
+  
+  // --- FIX: DEVICE INFO ADDED TO JSON ---
+  doc["deviceId"] = appConfig.deviceId;
+  doc["latitude"] = appConfig.latitude;
+  doc["longitude"] = appConfig.longitude;
+  // ------------------------------------
+
   doc["wifiSSID"] = appConfig.wifiSSID;
-  // NOTE: Passwords are not included in the JSON for security when loading the form.
+  // NOTE: Passwords are NOT included in the JSON for security.
   doc["mqttServer"] = appConfig.mqttServer;
   doc["mqttPort"] = appConfig.mqttPort;
   doc["mqttUser"] = appConfig.mqttUser;
@@ -50,7 +57,7 @@ String getSettingsPage() {
   doc["dustLEDPin"] = appConfig.dustLEDPin;
   doc["dustADCPin"] = appConfig.dustADCPin;
   doc["mqADCPin"] = appConfig.mqADCPin;
-  
+
   // --- ADDED: MQ Calibration Parameters ---
   doc["mq_rl_kohm"] = appConfig.mq_rl_kohm;
   doc["mq_r0_ratio_clean"] = appConfig.mq_r0_ratio_clean;
@@ -91,6 +98,14 @@ String getSettingsPage() {
         <div class="status">Current Status: )rawliteral"
                 + statusMsg + R"rawliteral(</div>
         <form id="configForm">
+        <h3>Device Info</h3>
+            <label for="deviceId">Device ID:</label>
+            <input type="text" id="deviceId" name="deviceId" required>
+            <label for="latitude">Latitude:</label>
+            <input type="number" step="0.000001" id="latitude" name="latitude">
+            <label for="longitude">Longitude:</label>
+            <input type="number" step="0.000001" id="longitude" name="longitude">
+
             <h3>WiFi Settings</h3>
             <label for="wifiSSID">WiFi SSID:</label>
             <input type="text" id="wifiSSID" name="wifiSSID" required>
@@ -146,6 +161,13 @@ String getSettingsPage() {
         // Load configuration data
         const configData = JSON.parse(')rawliteral"
                 + jsonConfig + R"rawliteral(');
+
+        // --- FIX: Load Device Info values ---
+        document.getElementById('deviceId').value = configData.deviceId;
+        document.getElementById('latitude').value = configData.latitude;
+        document.getElementById('longitude').value = configData.longitude;
+        // ------------------------------------
+
         document.getElementById('wifiSSID').value = configData.wifiSSID;
         document.getElementById('mqttServer').value = configData.mqttServer;
         document.getElementById('mqttPort').value = configData.mqttPort;
@@ -173,7 +195,7 @@ String getSettingsPage() {
             const data = {};
             for (const [key, value] of formData.entries()) {
                 // Parse float values correctly
-                if (['mq_rl_kohm', 'mq_r0_ratio_clean', 'tvoc_a_curve', 'tvoc_b_curve'].includes(key)) {
+                if (['mq_rl_kohm', 'mq_r0_ratio_clean', 'tvoc_a_curve', 'tvoc_b_curve', 'latitude', 'longitude'].includes(key)) { // Added lat/long here
                     data[key] = parseFloat(value);
                 } else if (['mqttPort', 'sendInterval', 'dustLEDPin', 'dustADCPin', 'mqADCPin'].includes(key)) {
                     // Parse pin numbers and intervals as integers
@@ -257,31 +279,33 @@ nav a{color:white;margin:0 10px;text-decoration:none;font-weight:bold;padding:5p
 <div class='card'><h4>Temp / Humidity (°C/%)</h4><div id='tempHumVal' class='value'>--</div><canvas id='chartTempHum'></canvas></div>
 <div class='card'><h4>Pressure (hPa)</h4><div id='presVal' class='value'>--</div><canvas id='chartPres'></canvas></div>
 <div class='card'><h4>Dust (ug/m3)</h4><div id='dustVal' class='value'>--</div><canvas id='chartDust'></canvas></div>
-<div class='card'><h4>TVOC (PPM)</h4><div id='mqVal' class='value'>--</div><canvas id='chartMQ'></canvas></div> 
-<div class='card' id='aqiCard' style="border-top: 5px solid #ccc;"><h4>Combined AQI</h4><div id='aqiVal' class='value'>--</div><canvas id='chartAQI'></canvas></div>
-<div class='card'><h4>WiFi RSSI (dBm)</h4><div id='wifiVal' class='value'>--</div><canvas id='chartWiFi'></canvas></div>
-</div>
+<div class='card'><h4>MQ-135 Raw (V)</h4><div id='mqRawVal' class='value'>--</div><canvas id='chartMQRaw'></canvas></div> 
+<div class='card' id='aqiCard' style="border-top: 5px solid #ccc;"><h4>**AQI (PM2.5)**</h4><div id='**aqiPm25Val**' class='value'>--</div><canvas id='**chartAQI**'></canvas></div> </div>
 <script>
-let labels=[], tempHumData=[], presData=[], dustData=[], mqData=[], aqiData=[], wifiData=[];
+// Data arrays: Đã xóa mqData. Đổi aqiData thành aqiPm25Data.
+let labels=[], tempHumData=[], presData=[], dustData=[], mqRawData=[], **aqiPm25Data**=[]; 
 const maxPoints=120; // Data resampling: 120 points (e.g., 10 minutes at 5s interval)
 
 function addData(arr,v){arr.push(v);if(arr.length>maxPoints) arr.shift();}
 function getAQIColor(aqi){if(aqi<=50)return'#00e400';else if(aqi<=100)return'#ffff00';else if(aqi<=150)return'#ff7e00';else if(aqi<=200)return'#ff0000';else if(aqi<=300)return'#99004c';else return'#7e0023';}
 
-// Chart creation function
-function createChart(ctx,dataArray,color, beginAtZero=false){
+// Chart creation function: Accepts single or multiple datasets
+function createChart(ctx, datasets, beginAtZero=false){
+  // If datasets is a single data array, wrap it into a standard dataset object
+  let chartDatasets = Array.isArray(datasets) ? datasets : [{
+      data: datasets,
+      borderColor: '#3498db', // Default color if not provided in array
+      fill: false, 
+      tension: 0.4, 
+      pointRadius: 0, 
+      borderWidth: 1.5 
+  }];
+
   return new Chart(ctx,{
     type:'line',
     data:{
       labels:labels,
-      datasets:[{
-        data:dataArray,
-        borderColor:color,
-        fill:false,
-        tension: 0.4, 
-        pointRadius: 0, 
-        borderWidth: 1.5 
-      }]
+      datasets: chartDatasets
     },
     options:{
       animation:{duration:0},
@@ -309,12 +333,21 @@ function createChart(ctx,dataArray,color, beginAtZero=false){
 }
 
 // Initializing charts
-const chartTempHum=createChart(document.getElementById('chartTempHum').getContext('2d'),tempHumData,'#e74c3c', false);
-const chartPres=createChart(document.getElementById('chartPres').getContext('2d'),presData,'#3498db', false);
-const chartDust=createChart(document.getElementById('chartDust').getContext('2d'),dustData,'#964B00', true);
-const chartMQ=createChart(document.getElementById('chartMQ').getContext('2d'),mqData,'#f39c12', true);
-const chartAQI=createChart(document.getElementById('chartAQI').getContext('2d'),aqiData,'#8e44ad', true);
-const chartWiFi=createChart(document.getElementById('chartWiFi').getContext('2d'),wifiData,'#2ecc71', false);
+const chartTempHum=createChart(document.getElementById('chartTempHum').getContext('2d'),[{data:tempHumData,borderColor:'#e74c3c',fill:false,tension:0.4,pointRadius:0,borderWidth:1.5}], false);
+const chartPres=createChart(document.getElementById('chartPres').getContext('2d'),[{data:presData,borderColor:'#3498db',fill:false,tension:0.4,pointRadius:0,borderWidth:1.5}], false);
+
+// Dust Chart (only main data)
+const chartDust=createChart(document.getElementById('chartDust').getContext('2d'), [{data:dustData,borderColor:'#964B00',fill:false,tension:0.4,pointRadius:0,borderWidth:1.5}], true);
+
+// ĐÃ XÓA chartMQ (TVOC)
+// const chartMQ=createChart(document.getElementById('chartMQ').getContext('2d'),[{data:mqData,borderColor:'#f39c12',fill:false,tension:0.4,pointRadius:0,borderWidth:1.5}], true);
+
+// KHỞI TẠO BIỂU ĐỒ MỚI: MQ-135 Raw (Sử dụng màu khác để phân biệt)
+const chartMQRaw=createChart(document.getElementById('chartMQRaw').getContext('2d'),[{data:mqRawData,borderColor:'#3B3B98',fill:false,tension:0.4,pointRadius:0,borderWidth:1.5}], true);
+
+// ĐÃ ĐỔI TÊN BIẾN DỮ LIỆU
+const chartAQI=createChart(document.getElementById('chartAQI').getContext('2d'),[{data:**aqiPm25Data**,borderColor:'#8e44ad',fill:false,tension:0.4,pointRadius:0,borderWidth:1.5}], true);
+
 
 let ws=new WebSocket('ws://'+location.hostname+'/ws');
 ws.onmessage=e=>{
@@ -322,10 +355,10 @@ ws.onmessage=e=>{
   document.getElementById('tempHumVal').innerText=d.temp.toFixed(1)+'°C / '+d.humid.toFixed(1)+'%';
   document.getElementById('presVal').innerText=d.pressure.toFixed(1);
   document.getElementById('dustVal').innerText=d.dust.toFixed(1);
-  document.getElementById('mqVal').innerText=d.mq_tvoc_ppm; // FIX: Use mq_tvoc_ppm
-  document.getElementById('aqiVal').innerText=d.aqi;
-  document.getElementById('aqiCard').style.borderTop='5px solid '+getAQIColor(d.aqi);
-  document.getElementById('wifiVal').innerText=d.wifiRssi+' dBm';
+  // ĐÃ XÓA: document.getElementById('mqVal').innerText=d.mq_tvoc_ppm; 
+  document.getElementById('mqRawVal').innerText=d.mq_raw_v.toFixed(3) + ' V'; 
+  document.getElementById('**aqiPm25Val**').innerText=d.aqi_pm25; // SỬ DỤNG aqi_pm25 TỪ JSON VÀ ID MỚI
+  document.getElementById('aqiCard').style.borderTop='5px solid '+getAQIColor(d.aqi_pm25); // DÙNG aqi_pm25
 
   // Add data points
   // Convert microseconds (d.createdAt) to milliseconds for Date object
@@ -335,18 +368,20 @@ ws.onmessage=e=>{
   addData(tempHumData,d.temp);
   addData(presData,d.pressure);
   addData(dustData,d.dust);
-  addData(mqData,d.mq_tvoc_ppm); // FIX: Use mq_tvoc_ppm
-  addData(aqiData,d.aqi);
-  addData(wifiData,d.wifiRssi);
+  
+  // ĐÃ XÓA: addData(mqData,d.mq_tvoc_ppm); 
+  addData(mqRawData,d.mq_raw_v); 
+  addData(**aqiPm25Data**,d.aqi_pm25); // THÊM DỮ LIỆU aqi_pm25 MỚI
 
   // Update charts
   chartTempHum.update();
   chartPres.update();
   chartDust.update();
-  chartMQ.update();
+  // ĐÃ XÓA: chartMQ.update();
+  chartMQRaw.update(); 
   chartAQI.update();
-  chartWiFi.update();
 };
+// END MODIFICATIONS
 </script>
 </body>
 </html>
@@ -360,7 +395,7 @@ ws.onmessage=e=>{
   });
 
   // Handle configuration saving (POST request)
- server.on(
+  server.on(
     "/save", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
       if (index == 0) Serial.println("Web: Receiving config update...");
 
@@ -377,6 +412,12 @@ ws.onmessage=e=>{
       // Update configuration variables
       // ... (Existing network and timing updates) ...
 
+      // --- FIX: DEVICE INFO SAVING ---
+      if (doc.containsKey("deviceId")) strncpy(appConfig.deviceId, doc["deviceId"], sizeof(appConfig.deviceId));
+      if (doc.containsKey("latitude")) appConfig.latitude = doc["latitude"].as<float>();
+      if (doc.containsKey("longitude")) appConfig.longitude = doc["longitude"].as<float>();
+      // -----------------------------
+      
       if (doc.containsKey("wifiSSID")) strncpy(appConfig.wifiSSID, doc["wifiSSID"], sizeof(appConfig.wifiSSID));
       if (doc.containsKey("wifiPass") && doc["wifiPass"].as<String>().length() > 0)
         strncpy(appConfig.wifiPass, doc["wifiPass"], sizeof(appConfig.wifiPass));
@@ -395,7 +436,7 @@ ws.onmessage=e=>{
       if (doc.containsKey("dustLEDPin")) appConfig.dustLEDPin = doc["dustLEDPin"].as<uint8_t>();
       if (doc.containsKey("dustADCPin")) appConfig.dustADCPin = doc["dustADCPin"].as<uint8_t>();
       if (doc.containsKey("mqADCPin")) appConfig.mqADCPin = doc["mqADCPin"].as<uint8_t>();
-      
+
       // --- ADDED: MQ Calibration Parameters (parsing floats) ---
       if (doc.containsKey("mq_rl_kohm")) appConfig.mq_rl_kohm = doc["mq_rl_kohm"].as<float>();
       if (doc.containsKey("mq_r0_ratio_clean")) appConfig.mq_r0_ratio_clean = doc["mq_r0_ratio_clean"].as<float>();

@@ -1,5 +1,5 @@
 // weather-esp32.ino
-#include <Arduino.h> 
+#include <Arduino.h>
 #include <WiFiClient.h>
 #include <PubSubClient.h>
 #include <ESPAsyncWebServer.h>
@@ -98,8 +98,23 @@ void loop() {
 
     // Publish via MQTT (only if connected)
     if (mqttClient.connected()) {
-      mqttClient.publish(appConfig.mqttTopic, latestJson.c_str());
+      Serial.printf("[MQTT] Publishing to topic: %s\n", appConfig.mqttTopic);
+
+      // DEBUG: in ra gói JSON
+      Serial.println("[MQTT] Payload:");
+      Serial.println(latestJson);
+
+      // *** ĐÂY LÀ KHỐI LỆNH ĐÃ ĐƯỢC SỬA ĐỂ GHI LOG TRẠNG THÁI PUBLISH ***
+      if (mqttClient.publish(appConfig.mqttTopic, latestJson.c_str())) {
+        Serial.println("[MQTT] Publish SUCCESS.");
+      } else {
+        // In ra mã trạng thái lỗi nếu publish thất bại (ví dụ: lỗi kết nối, broker từ chối)
+        Serial.printf("[MQTT] Publish FAILED. MQTT State Code: %d\n", mqttClient.state());
+      }
+      // *** END SỬA ĐỔI ***
+
     } else if (isWifiConnected) {
+      // isWifiConnected cần được cập nhật trong maintainWiFi() hoặc trong loop()
       Serial.println("[MQTT] Not connected. Data not published.");
     }
 
