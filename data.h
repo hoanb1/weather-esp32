@@ -1,4 +1,3 @@
-// data.h
 #pragma once
 
 #include <WiFi.h>
@@ -7,45 +6,74 @@
 #include <PubSubClient.h>
 #include <Adafruit_BME280.h>
 #include <GP2YDustSensor.h>
-#include "config.h"
 
-// ================= CONFIG & GLOBAL VARIABLES ==================
+#include "config.h"
+#include "MQ135_ESP32.h"
+
+// -----------------------------------------------------------------------------
+// External Objects
+// -----------------------------------------------------------------------------
+extern AsyncWebServer server;
+extern AsyncWebSocket ws;
+
+extern WiFiClient espClient;
+extern PubSubClient mqttClient;
+
+extern Adafruit_BME280 bme;
+extern GP2YDustSensor* dustSensor;
+extern MQ135_ESP32* mq135;
+
 extern AppConfig_t appConfig;
 extern String latestJson;
 extern unsigned long lastSend;
 extern bool isWifiConnected;
 extern bool bmeInitialized;
 
-
-
-// ================= HARDWARE & SENSOR DECLARATIONS ==================
-
-extern WiFiClient espClient;
-extern PubSubClient mqttClient;
-extern AsyncWebServer server;
-extern AsyncWebSocket ws;
-extern Adafruit_BME280 bme;
-
-// MODIFIED: Declared as a pointer, initialized in data_sensor.cpp's initDustSensor
-extern GP2YDustSensor *dustSensor; 
-
-// ================= FUNCTION PROTOTYPES ==================
-
-// Prototypes for data_sensor.cpp
+// -----------------------------------------------------------------------------
+// Data & Sensor Handling
+// -----------------------------------------------------------------------------
 String getDataJson();
-void setupTime();
-void initDustSensor(); // NEW: Used to initialize dustSensor after config load
 int calcAQI(float pm25);
 
-// Prototypes for web_server.cpp
+// -----------------------------------------------------------------------------
+// Time
+// -----------------------------------------------------------------------------
+void setupTime();
+
+// -----------------------------------------------------------------------------
+// Dust Sensor
+// -----------------------------------------------------------------------------
+void initDustSensor();
+
+// -----------------------------------------------------------------------------
+// Web / WebSocket
+// -----------------------------------------------------------------------------
 void notifyClients(String msg);
 void setupWebServer();
-void handleReboot(AsyncWebServerRequest *request);
-void handleReset(AsyncWebServerRequest *request);
+void onWsEvent(AsyncWebSocket* server,
+                AsyncWebSocketClient* client,
+                AwsEventType type,
+                void* arg,
+                uint8_t* data,
+                size_t len);
 
-// Prototypes for wifi_manager.cpp
+void handleReboot(AsyncWebServerRequest* request);
+void handleReset(AsyncWebServerRequest* request);
+
+// -----------------------------------------------------------------------------
+// WiFi
+// -----------------------------------------------------------------------------
 void setupWiFi();
 void maintainWiFi();
+
+// -----------------------------------------------------------------------------
+// MQTT
+// -----------------------------------------------------------------------------
 void reconnectMQTT();
 
-void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
+// -----------------------------------------------------------------------------
+// MQ135
+// -----------------------------------------------------------------------------
+void initMQ135();
+void startMQ135Calibration();
+void processMQ135Calibration(MQ135_ESP32& sensor);

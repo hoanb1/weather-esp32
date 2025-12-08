@@ -1,313 +1,232 @@
-// data_sensor.cpp
 #include <Arduino.h>
 #include "data.h"
 #include "config.h"
 #include <ArduinoJson.h>
-#include "time.h"
-#include <math.h>  // for powf, isfinite, NAN
+#include "MQ135_ESP32.h"
 
-// --- Global Variable Definitions ---
+// -------------------------------------------------------------------
+// Global Sensor Instances
+// -------------------------------------------------------------------
 Adafruit_BME280 bme;
-GP2YDustSensor *dustSensor = nullptr;
+GP2YDustSensor* dustSensor = nullptr;
 bool bmeInitialized = false;
 
-// Fixed Constants (ESP32 ADC)
-const float VCC_VOLTS = 3.3f;  // ESP32 ADC reference voltage
-const int ADC_MAX = 4095;      // 12-bit ADC Resolution
+// MQ135 ESP32 instance
+MQ135_ESP32* mq135 = nullptr;
 
-// External Variables
-extern AsyncWebSocket ws;
-extern String latestJson;
+// Calibration state
+bool mqCalibrating = false;
+int mqCalibSamples = 0;
+float mqCalibTotal = 0.0f;
+unsigned long mqLastCalibMillis = 0;
+
+const unsigned long MQ_CALIB_INTERVAL = 200;   // ms
+const int MQ_CALIB_MAX_SAMPLES = 50;
+
 
 // -------------------------------------------------------------------
-// --- Sensor Initialization ---
+// MQ135 Initialization
 // -------------------------------------------------------------------
+void initMQ135() {
+    if (mq135) {
+        addLog("[MQ135] Already initialized");
+        return;
+    }
 
+    addLogf("[MQ135] Initializing on ADC pin %d", appConfig.mqADCPin);
+
+    mq135 = new MQ135_ESP32(appConfig.mqADCPin, appConfig.mq_rzero, 10.0f);
+
+    delay(100);
+
+    int adc = analogRead(appConfig.mqADCPin);
+    float volt = adc * 3.3f / 4095.0f;
+
+    addLogf("[MQ135] Initial ADC=%d  Voltage=%.3fV", adc, volt);
+
+    if (adc == 0) {
+        addLog("[MQ135][Warning] ADC=0. Check wiring or sensor connection.");
+    }
+
+    mq135->warmupStart();
+    addLog("[MQ135] Warm-up started");
+
+    if (appConfig.mq_rzero <= 0.0f) {
+        addLog("[MQ135] No stored RZero. Running calibration.");
+        startMQ135Calibration();
+    } else {
+        addLogf("[MQ135] Using stored RZero=%.2f", appConfig.mq_rzero);
+    }
+}
+
+
+// -------------------------------------------------------------------
+// Start MQ135 Calibration
+// -------------------------------------------------------------------
+void startMQ135Calibration() {
+    if (appConfig.mq_rzero <= 0.0f) {
+        addLog("[MQ135] Starting calibration. Keep sensor in clean air.");
+        mqCalibrating = true;
+        mqCalibSamples = 0;
+        mqCalibTotal = 0.0f;
+        mqLastCalibMillis = millis();
+    }
+}
+
+
+// -------------------------------------------------------------------
+// Process MQ135 Calibration (call periodically)
+// -------------------------------------------------------------------
+void processMQ135Calibration(MQ135_ESP32& sensor) {
+    if (!mqCalibrating) return;
+
+    unsigned long now = millis();
+    if (now - mqLastCalibMillis < MQ_CALIB_INTERVAL) return;
+    mqLastCalibMillis = now;
+
+    float rs = sensor.getResistanceESP32();
+    if (!isfinite(rs) || rs <= 0.0f) {
+        addLog("[MQ135] Invalid Rs reading, skipping sample");
+        return;
+    }
+
+    if (appConfig.mq_r0_ratio_clean <= 0.0f) {
+        appConfig.mq_r0_ratio_clean = 3.6f;
+    }
+
+    float currentRZero = rs / appConfig.mq_r0_ratio_clean;
+    mqCalibTotal += currentRZero;
+    mqCalibSamples++;
+
+    addLogf("[MQ135] Calibration sample %d: RZero=%.2f",
+            mqCalibSamples, currentRZero);
+
+    if (mqCalibSamples >= MQ_CALIB_MAX_SAMPLES) {
+        float rzero = mqCalibTotal / mqCalibSamples;
+        appConfig.mq_rzero = rzero;
+        saveConfig();
+
+        addLogf("[MQ135] Calibration complete. Saved RZero=%.2f", rzero);
+        mqCalibrating = false;
+    }
+}
+
+
+// -------------------------------------------------------------------
+// Dust Sensor Initialization
+// -------------------------------------------------------------------
 void initDustSensor() {
-  if (dustSensor == NULL) {
-    // NOTE: appConfig.dustADCPin is the analog pin (Vo)
-    dustSensor = new GP2YDustSensor(
-      GP2YDustSensorType::GP2Y1014AU0F,
-      appConfig.dustLEDPin,
-      appConfig.dustADCPin);
-    dustSensor->begin();
-  }
+    if (!dustSensor) {
+        dustSensor = new GP2YDustSensor(
+            GP2YDustSensorType::GP2Y1014AU0F,
+            appConfig.dustLEDPin,
+            appConfig.dustADCPin
+        );
+        dustSensor->begin();
+    }
 }
 
-// -------------------------------------------------------------------
-// --- System & Utility Functions ---
-// -------------------------------------------------------------------
 
+// -------------------------------------------------------------------
+// Utility
+// -------------------------------------------------------------------
 uint64_t getCurrentTimeMicroseconds() {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return (uint64_t)tv.tv_sec * 1000000ULL + tv.tv_usec;
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (uint64_t)tv.tv_sec * 1000000ULL + tv.tv_usec;
 }
 
-void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
-  if (type == WS_EVT_CONNECT) {
-    Serial.printf("WS: Client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
-    client->text(latestJson);
-  } else if (type == WS_EVT_DISCONNECT) {
-    Serial.printf("WS: Client #%u disconnected\n", client->id());
-  } else if (type == WS_EVT_DATA) {
-    // ignore for now
-  }
+
+// -------------------------------------------------------------------
+// WebSocket Events
+// -------------------------------------------------------------------
+void onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
+               AwsEventType type, void* arg, uint8_t* data, size_t len) 
+{
+    if (type == WS_EVT_CONNECT) {
+        addLogf("WS: Client #%u connected from %s",
+                client->id(), client->remoteIP().toString().c_str());
+        client->text(latestJson);
+    } 
+    else if (type == WS_EVT_DISCONNECT) {
+        addLogf("WS: Client #%u disconnected", client->id());
+    }
 }
 
 void notifyClients(String json) {
-  ws.textAll(json);
+    ws.textAll(json);
 }
 
-// -------------------------------------------------------------------
-// --- MQ Sensor Calculation Helpers ---
-// -------------------------------------------------------------------
-
-/**
- * Convert ADC raw reading (0..ADC_MAX) -> sensor output voltage (V)
- */
-static float adcToVoltage(int adc_raw) {
-  // Protect against invalid adc_raw
-  if (adc_raw <= 0) return 0.0f;
-  if (adc_raw > ADC_MAX) adc_raw = ADC_MAX;
-  return (float)adc_raw * VCC_VOLTS / (float)ADC_MAX;
-}
-
-/**
- * Calculate sensor resistance Rs (kOhm) from ADC raw.
- * Formula derived from voltage divider: Rs = (Vcc - Vout) * RL / Vout
- * RL (kOhm) is appConfig.mq_rl_kohm
- */
-static float calculateRs_kOhm(int mq_raw) {
-  float vout = adcToVoltage(mq_raw);
-  if (vout <= 0.0001f) return INFINITY;  // avoid divide by zero
-  float rl = appConfig.mq_rl_kohm;       // kOhm
-  // Rs in kOhm
-  float rs = ((VCC_VOLTS - vout) * rl) / vout;
-  return rs;
-}
-
-/**
- * Estimate sensor R0 (kOhm) using configured baseline ratio.
- * NOTE: This is a rough estimate. Ideal workflow: perform calibration once in known-clean-air,
- * call a calibration routine to store exact R0 into non-volatile storage.
- *
- * If mq_r0_ratio_clean is the expected Rs/R0 in clean air, then:
- * R0_est = Rs_clean / (Rs/R0) = Rs_clean / mq_r0_ratio_clean
- *
- * Here we estimate R0 from current Rs measurement using baseline ratio.
- */
-static float estimateR0_kOhm_fromBaselineRs(float rs_kohm) {
-  if (!isfinite(rs_kohm) || rs_kohm <= 0.0f) return NAN;
-  float ratio = appConfig.mq_r0_ratio_clean;
-  if (ratio <= 0.0f) return NAN;
-  return rs_kohm / ratio;
-}
-
-/**
- * Compute Rs/R0 ratio.
- * If you have a stored/calibrated R0, prefer to use that. This function uses the
- * rough estimate method when exact R0 not available.
- */
-static float calculateRsOverR0(int mq_raw) {
-  float rs = calculateRs_kOhm(mq_raw);
-  if (!isfinite(rs)) return NAN;
-  float r0_est = estimateR0_kOhm_fromBaselineRs(rs);
-  if (!isfinite(r0_est) || r0_est <= 0.0f) return NAN;
-  return rs / r0_est;
-}
 
 // -------------------------------------------------------------------
-// --- TVOC estimation ---
+// AQI Calculation
 // -------------------------------------------------------------------
-/**
- * Calculates estimated TVOC concentration in PPM from the Rs/R0 ratio using a power-law curve.
- */
-float calculateTVOC_PPM(int mq_raw) {
-  float rs_ro = calculateRsOverR0(mq_raw);
-  if (!isfinite(rs_ro) || rs_ro <= 0.0f) {
-    // unable to compute reliable ratio: return NAN to indicate invalid measurement
-    return NAN;
-  }
-
-  // Apply power law curve: PPM = A * (Rs/R0)^B
-  float A = appConfig.tvoc_a_curve;
-  float B = appConfig.tvoc_b_curve;
-
-  // Protect against crazy values
-  if (!isfinite(A) || !isfinite(B)) return NAN;
-
-  float ppm = A * powf(rs_ro, B);
-
-  // Clamp to reasonable bounds (0 .. 10000 ppm).
-  if (!isfinite(ppm)) return NAN;
-  if (ppm < 0.0f) ppm = 0.0f;
-  if (ppm > 10000.0f) ppm = 10000.0f;
-
-  return ppm;
-}
-
-// -------------------------------------------------------------------
-// --- AQI (PM2.5) using EPA breakpoints and linear interpolation ---
-// -------------------------------------------------------------------
-
-/**
- * Linear interpolate helper for AQI between breakpoints.
- */
 static int linearAQI(float Cp, float Clow, float Chigh, int Ilow, int Ihigh) {
-  if (Chigh == Clow) return Ilow;
-  float a = (Ihigh - Ilow) / (Chigh - Clow);
-  float val = a * (Cp - Clow) + Ilow;
-  return (int)roundf(val);
+    if (Chigh == Clow) return Ilow;
+    return (int)roundf((Ihigh - Ilow) / (Chigh - Clow) * (Cp - Clow) + Ilow);
 }
 
-/**
- * Calculate AQI for PM2.5 concentration (µg/m3) using EPA breakpoints.
- * Uses the standard piecewise linear interpolation.
- */
 int calcAQI_PM25(float pm25) {
-  // pm25 expected in µg/m3
-  if (pm25 < 0.0f || !isfinite(pm25)) return -1;
+    if (pm25 < 0.0f || !isfinite(pm25)) return -1;
 
-  // Breakpoints from EPA (PM2.5 - µg/m3)
-  // 0.0 - 12.0   -> 0 - 50
-  // 12.1 - 35.4  -> 51 - 100
-  // 35.5 - 55.4  -> 101 - 150
-  // 55.5 - 150.4 -> 151 - 200
-  // 150.5 - 250.4-> 201 - 300
-  // 250.5 - 350.4-> 301 - 400
-  // 350.5 - 500.4-> 401 - 500
+    if (pm25 <= 12.0f)   return linearAQI(pm25, 0.0f, 12.0f, 0, 50);
+    if (pm25 <= 35.4f)  return linearAQI(pm25, 12.1f, 35.4f, 51, 100);
+    if (pm25 <= 55.4f)  return linearAQI(pm25, 35.5f, 55.4f, 101, 150);
+    if (pm25 <= 150.4f) return linearAQI(pm25, 55.5f, 150.4f, 151, 200);
+    if (pm25 <= 250.4f) return linearAQI(pm25, 150.5f, 250.4f, 201, 300);
+    if (pm25 <= 350.4f) return linearAQI(pm25, 250.5f, 350.4f, 301, 400);
+    if (pm25 <= 500.4f) return linearAQI(pm25, 350.5f, 500.4f, 401, 500);
 
-  if (pm25 <= 12.0f) {
-    return linearAQI(pm25, 0.0f, 12.0f, 0, 50);
-  } else if (pm25 <= 35.4f) {
-    return linearAQI(pm25, 12.1f, 35.4f, 51, 100);
-  } else if (pm25 <= 55.4f) {
-    return linearAQI(pm25, 35.5f, 55.4f, 101, 150);
-  } else if (pm25 <= 150.4f) {
-    return linearAQI(pm25, 55.5f, 150.4f, 151, 200);
-  } else if (pm25 <= 250.4f) {
-    return linearAQI(pm25, 150.5f, 250.4f, 201, 300);
-  } else if (pm25 <= 350.4f) {
-    return linearAQI(pm25, 250.5f, 350.4f, 301, 400);
-  } else if (pm25 <= 500.4f) {
-    return linearAQI(pm25, 350.5f, 500.4f, 401, 500);
-  } else {
-    return 500;  // beyond scale
-  }
+    return 500;
 }
 
-// -------------------------------------------------------------------
-// --- IAQI / AQI mapping for TVOC (Custom mapping) ---
-// -------------------------------------------------------------------
-/*
- * NOTE: The breakpoints below are custom and should be tuned after calibration.
- */
-int calcAQI_TVOC(float tvoc_ppm) {
-  if (!isfinite(tvoc_ppm) || tvoc_ppm < 0.0f) return -1;
-
-  // Use ppm as provided by calculateTVOC_PPM
-  if (tvoc_ppm <= 0.300f) {
-    return linearAQI(tvoc_ppm, 0.0f, 0.300f, 0, 50);
-  } else if (tvoc_ppm <= 0.600f) {
-    return linearAQI(tvoc_ppm, 0.301f, 0.600f, 51, 100);
-  } else if (tvoc_ppm <= 1.000f) {
-    return linearAQI(tvoc_ppm, 0.601f, 1.000f, 101, 150);
-  } else if (tvoc_ppm <= 3.000f) {
-    return linearAQI(tvoc_ppm, 1.001f, 3.000f, 151, 200);
-  } else {
-    // Above 3 ppm -> map into 201..500 range (rough)
-    float Clow = 3.001f, Chigh = 10.0f;
-    int Ilow = 201, Ihigh = 500;
-    float Cp = tvoc_ppm;
-    if (Cp >= Chigh) return 500;
-    return linearAQI(Cp, Clow, Chigh, Ilow, Ihigh);
-  }
+static float safe_round(float val, int decimals) {
+    if (!isfinite(val)) return NAN;
+    float factor = powf(10.0f, (float)decimals);
+    return roundf(val * factor) / factor;
 }
 
-// -------------------------------------------------------------------
-// --- Main Data Getter ---
-// -------------------------------------------------------------------
 
+// -------------------------------------------------------------------
+// Main JSON Data Builder
+// -------------------------------------------------------------------
 String getDataJson() {
-  // Read BME280
-  float t = NAN, h = NAN, p = NAN;
-  if (bmeInitialized) {
-    t = bme.readTemperature();
-    h = bme.readHumidity();
-    p = bme.readPressure() / 100.0F;  // Pa -> hPa
-  }
+    float t = NAN, h = NAN, p = NAN;
 
-  // Read MQ Sensor
-  int mq_raw = analogRead(appConfig.mqADCPin);
-  float mq_tvoc_ppm = calculateTVOC_PPM(mq_raw);  // ppm (may be NAN if failed)
+    if (bmeInitialized) {
+        t = bme.readTemperature();
+        h = bme.readHumidity();
+        p = bme.readPressure() / 100.0f;
+    }
 
-  // Read Dust Sensor & Calculate AQI
-  uint16_t dust = 0;
-  //float dustBaseline = NAN;  // Default to NAN
+    int mq_raw = analogRead(appConfig.mqADCPin);
+    float mq_co2_ppm = mq135->getCorrectedPPM(t, h);
 
-//   if (dustSensor != nullptr) {
-//     dust = dustSensor->getDustDensity();
-//     // Use getBaselineCandidate() to get the current/latest calculated zeroDustVoltage (in Volts)
-//     dustBaseline = dustSensor->getBaselineCandidate();
-//   }
-  // Interpret dust reading as PM2.5 ug/m3
-  float pm25 = (float)dust;
-  int aqi_pm25 = calcAQI_PM25(pm25);
+    uint16_t dust = dustSensor ? dustSensor->getDustDensity() : 0;
+    float pm25 = (float)dust;
+    int aqi_pm25 = calcAQI_PM25(pm25);
 
-  int aqi_tvoc = -1;
-  if (isfinite(mq_tvoc_ppm)) {
-    aqi_tvoc = calcAQI_TVOC(mq_tvoc_ppm);
-  }
+    uint64_t ts = getCurrentTimeMicroseconds();
 
-  // Determine Combined AQI (Max of the two valid indices)
-  int combined_aqi = aqi_pm25;
-  if (aqi_tvoc > combined_aqi) combined_aqi = aqi_tvoc;
+    t = safe_round(t, 1);
+    h = safe_round(h, 1);
+    mq_co2_ppm = safe_round(mq_co2_ppm, 0);
 
-  //int wifiRssi = WiFi.RSSI();
-  uint64_t createdAt = getCurrentTimeMicroseconds();
+    StaticJsonDocument<256> doc;
 
-  //   Serial.printf("[DATA] T=%.1f H=%.1f P=%.1f Dust=%u DustBaseline=%.4f (V) MQ_Raw=%d TVOC_PPM=%s Rs/R0=%.3f AQI=%d WiFi=%d Time=%llu\n",
-  //                 isnan(t) ? 0.0f : t,
-  //                 isnan(h) ? 0.0f : h,
-  //                 isnan(p) ? 0.0f : p,
-  //                 dust,
-  //                 dustBaseline,
-  //                 mq_raw,
-  //                 (isfinite(mq_tvoc_ppm) ? String(mq_tvoc_ppm, 1).c_str() : "nan"),
-  //                 calculateRsOverR0(mq_raw),
-  //                 combined_aqi,
-  //                 wifiRssi,
-  //                 createdAt);
+    doc["id"] = appConfig.deviceId;
 
-  // Create JSON document
+    if (isfinite(t)) doc["t"] = t;
+    if (isfinite(h)) doc["h"] = h;
+    if (isfinite(p)) doc["p"] = p;
 
-  StaticJsonDocument<512> doc;
+    doc["pm"]  = dust;
+    doc["mq"]  = mq_raw;
+    doc["c"]   = mq_co2_ppm;
+    doc["aqi"] = aqi_pm25;
+    doc["ts"]  = ts;
 
-  doc["deviceId"] = appConfig.deviceId;
-  // doc["latitude"] = appConfig.latitude;
-  // doc["longitude"] = appConfig.longitude;
-
-
-  if (isfinite(t)) doc["temp"] = t;
-  if (isfinite(h)) doc["humid"] = h;
-  if (isfinite(p)) doc["pressure"] = p;
-  doc["dust"] = dust;
-  // Send baseline in Volts (V)
-  //if (isfinite(dustBaseline)) doc["dust_baseline"] = dustBaseline;
-
-  doc["mq135_raw"] = mq_raw;
-  doc["mq_rs_ro"] = calculateRsOverR0(mq_raw);
-  if (isfinite(mq_tvoc_ppm)) doc["mq_tvoc_ppm"] = mq_tvoc_ppm;
-  else doc["mq_tvoc_ppm"] = nullptr;
-  doc["aqi"] = combined_aqi;
-  doc["aqi_pm25"] = aqi_pm25;
-  doc["aqi_tvoc"] = aqi_tvoc;
-  // doc["wifiRssi"] = wifiRssi;
-  doc["createdAt"] = createdAt;
-
-
-  String json;
-  serializeJson(doc, json);
-  return json;
+    String json;
+    serializeJson(doc, json);
+    return json;
 }

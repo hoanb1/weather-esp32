@@ -1,121 +1,142 @@
-// weather-esp32.ino
 #include <Arduino.h>
 #include <WiFiClient.h>
 #include <PubSubClient.h>
 #include <ESPAsyncWebServer.h>
 #include "config.h"
 #include "data.h"
+#include "MQ135_ESP32.h"
 
-
-// --- Global Object Definitions ---
-// Required for MQTT connection
+// --- Global Objects ---
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
-// Required for WebServer and WebSocket
-AsyncWebServer server(80);
-AsyncWebSocket ws("/ws");
-
-// Required for data loop timing and state
 String latestJson = "{}";
 unsigned long lastSend = 0;
+void logAppConfig() {
+  addLog("===== AppConfig =====");
 
-// ================= SETUP ==================
+  // WiFi
+  addLogf("WiFi SSID       : %s", appConfig.wifiSSID);
+  addLogf("WiFi Pass       : %s", appConfig.wifiPass);
+
+  // MQTT
+  addLogf("MQTT Server     : %s", appConfig.mqttServer);
+  addLogf("MQTT Port       : %d", appConfig.mqttPort);
+  addLogf("MQTT User       : %s", appConfig.mqttUser);
+  addLogf("MQTT Pass       : %s", appConfig.mqttPass);
+  addLogf("MQTT Topic      : %s", appConfig.mqttTopic);
+
+  // Time
+  addLogf("NTP Server      : %s", appConfig.ntpServer);
+  addLogf("Send Interval   : %lu ms", appConfig.sendInterval);
+
+  // GPIO
+  addLogf("Dust LED Pin    : %d", appConfig.dustLEDPin);
+  addLogf("Dust ADC Pin    : %d", appConfig.dustADCPin);
+  addLogf("MQ135 ADC Pin   : %d", appConfig.mqADCPin);
+
+  // MQ135 calibration
+  addLog("---- MQ135 Calibration ----");
+  addLogf("RL (kOhm)       : %.3f", appConfig.mq_rl_kohm);
+  addLogf("R0 Clean Ratio  : %.3f", appConfig.mq_r0_ratio_clean);
+  addLogf("TVOC A Curve    : %.3f", appConfig.tvoc_a_curve);
+  addLogf("TVOC B Curve    : %.3f", appConfig.tvoc_b_curve);
+  addLogf("RZero           : %.3f", appConfig.mq_rzero);
+  addLogf("CO2 A Curve     : %.3f", appConfig.co2_a_curve);
+  addLogf("CO2 B Curve     : %.3f", appConfig.co2_b_curve);
+  addLogf("NH3 A Curve     : %.3f", appConfig.nh3_a_curve);
+  addLogf("NH3 B Curve     : %.3f", appConfig.nh3_b_curve);
+  addLogf("Alcohol A Curve : %.3f", appConfig.alcohol_a_curve);
+  addLogf("Alcohol B Curve : %.3f", appConfig.alcohol_b_curve);
+
+  // Device info
+  addLog("---- Device Info ----");
+  addLogf("Device ID       : %s", appConfig.deviceId);
+  addLogf("Latitude        : %.6f", appConfig.latitude);
+  addLogf("Longitude       : %.6f", appConfig.longitude);
+
+  addLog("======================");
+}
+
+
 void setup() {
   Serial.begin(115200);
-  Serial.println("\n--- Starting ESP32 Weather Station Setup ---");
+  addLog("--- Starting ESP32 Weather Station ---");
 
+  loadConfig();
+  logAppConfig();
 
-  // 1. Configuration & Sensor Initialization
-  loadConfig();  // Load configuration from NVS
+  addLog("[INIT] WiFi...");
+  setupWiFi();
 
-  Serial.printf("[CFG] Loaded WiFi: %s | MQTT: %s:%d\n", appConfig.wifiSSID, appConfig.mqttServer, appConfig.mqttPort);
+  addLog("[INIT] Web server...");
+  setupWebServer();
 
-  // Initialize sensors (using config pins)
-  initDustSensor();  // Uses appConfig pins
-  Serial.println("[SENSOR] GP2Y Dust Sensor initialized.");
+  addLog("[INIT] Dust sensor...");
+  initDustSensor();
 
-  // Initialize BME280
-  Serial.print("[SENSOR] Initializing BME280 (0x76)...");
+  addLog("[INIT] MQ135 sensor...");
+  initMQ135();
+
+  addLog("[INIT] BME280...");
   if (!bme.begin(0x76)) {
-    Serial.println("[ERROR] BME280 not found! Check wiring or address.");
+    addLog("[ERROR] BME280 not found");
     bmeInitialized = false;
-
   } else {
-    Serial.println("BME280 initialized!");
+    addLog("BME280 initialized");
     bmeInitialized = true;
   }
 
-  // Initial GP2Y10 Baseline
   float baseline = dustSensor->getBaselineCandidate();
   dustSensor->setBaseline(baseline);
-  Serial.printf("[BASELINE] Initial Dust Baseline set to: %.4f\n", baseline);
+  addLogf("[BASELINE] Dust baseline set to %.4f", baseline);
 
-  // 2. Connect WiFi (Fallback to Hotspot if failed)
-  setupWiFi();
+  addLog("[MQ135] Warmup...");
 
-  // 3. NTP Time Synchronization (Continues if failed)
+
+  addLog("[INIT] Time sync...");
   setupTime();
 
-  // 4. MQTT Configuration
+  addLogf("[INIT] MQTT server: %s:%d", appConfig.mqttServer, appConfig.mqttPort);
   mqttClient.setServer(appConfig.mqttServer, appConfig.mqttPort);
 
-  // 5. Web Server
-  setupWebServer();
-
-  Serial.println("--- Setup Complete. Starting Main Loop ---");
+  addLog("--- Setup Complete ---");
 }
 
-// ================= LOOP ==================
 void loop() {
-  // Maintain WiFi connection (reconnect if lost)
   maintainWiFi();
-
-  // Attempt to maintain MQTT connection if WiFi is active
   reconnectMQTT();
   mqttClient.loop();
-
-  // Handle WebSocket clients
   ws.cleanupClients();
 
-  // Gradual baseline adjustment (only decreases)
-  static unsigned long lastBaselineCheck = millis();
+  // Dust baseline adjustment
+  static unsigned long lastBaselineCheck = 0;
   if (millis() - lastBaselineCheck > 60000) {
     float candidate = dustSensor->getBaselineCandidate();
     if (candidate < dustSensor->getBaseline()) {
       dustSensor->setBaseline(candidate);
-      Serial.printf("[BASELINE] Adjusted: %.4f\n", candidate);
+      addLogf("[BASELINE] Adjusted: %.4f", candidate);
     }
     lastBaselineCheck = millis();
   }
 
-  // Send data periodically
+  mq135->warmupLoop();
+
+  if (!mq135->isWarmingUp()) {
+    processMQ135Calibration(*mq135);
+  }
+
+  // Send data
   if (millis() - lastSend >= appConfig.sendInterval) {
     latestJson = getDataJson();
-
-    // Send via WebSocket (for Dashboard)
     notifyClients(latestJson);
 
-    // Publish via MQTT (only if connected)
     if (mqttClient.connected()) {
-      Serial.printf("[MQTT] Publishing to topic: %s\n", appConfig.mqttTopic);
-
-      // DEBUG: in ra gói JSON
-      Serial.println("[MQTT] Payload:");
-      Serial.println(latestJson);
-
-      // *** ĐÂY LÀ KHỐI LỆNH ĐÃ ĐƯỢC SỬA ĐỂ GHI LOG TRẠNG THÁI PUBLISH ***
-      if (mqttClient.publish(appConfig.mqttTopic, latestJson.c_str())) {
-        Serial.println("[MQTT] Publish SUCCESS.");
-      } else {
-        // In ra mã trạng thái lỗi nếu publish thất bại (ví dụ: lỗi kết nối, broker từ chối)
-        Serial.printf("[MQTT] Publish FAILED. MQTT State Code: %d\n", mqttClient.state());
+      if (!mqttClient.publish(appConfig.mqttTopic, latestJson.c_str())) {
+        addLogf("[MQTT] Publish FAILED. State=%d", mqttClient.state());
       }
-      // *** END SỬA ĐỔI ***
-
     } else if (isWifiConnected) {
-      // isWifiConnected cần được cập nhật trong maintainWiFi() hoặc trong loop()
-      Serial.println("[MQTT] Not connected. Data not published.");
+      addLog("[MQTT] Not connected. Data not published.");
     }
 
     lastSend = millis();

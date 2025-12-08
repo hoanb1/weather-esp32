@@ -1,81 +1,98 @@
 // config_manager.cpp
 
 #include <Arduino.h>
+#include <Preferences.h>
+#include <ArduinoJson.h>
+#include <cstdarg>
+
 #include "data.h"
 #include "config.h"
 
-#include <Preferences.h>
-#include <ArduinoJson.h>
-
 AppConfig_t appConfig;
-
 Preferences preferences;
 
+LogEntry logBuffer[LOG_BUFFER_SIZE];
+uint8_t logIndex = 0;
 
-// Default Configuration values
+// Default Configuration
 const AppConfig_t defaultConfig = {
-  // ... (Existing network and GPIO settings)
-  .wifiSSID = "HH",
-  .wifiPass = "12345678",
-  .mqttServer = "pi.hoan.uk",
-  .mqttPort = 1883,
-  .mqttUser = "weather",
-  .mqttPass = "hoan1234",
-  .mqttTopic = "weather/data",
-  .sendInterval = 5000,  // 5 seconds
-  .ntpServer = "pool.ntp.org",
+    .wifiSSID = "HH-1301",
+    .wifiPass = "tutulala",
+    .mqttServer = "pi.hoan.uk",
+    .mqttPort = 1883,
+    .mqttUser = "weather",
+    .mqttPass = "hoan1234",
+    .mqttTopic = "weather/data",
+    .sendInterval = 5000,
+    .ntpServer = "pool.ntp.org",
 
-  .dustLEDPin = 15,
-  .dustADCPin = 35,
-  .mqADCPin = 34,
+    .dustLEDPin = 15,
+    .dustADCPin = 35,
+    .mqADCPin = 34,
 
-  // --- DEFAULT MQ-135 CALIBRATION ---
-  .mq_rl_kohm = 10.0,        // Load Resistor is 10kOhm
-  .mq_r0_ratio_clean = 3.6,  // Baseline Rs/R0 ratio in clean air
-  .tvoc_a_curve = 116.602,   // TVOC Power curve A constant
-  .tvoc_b_curve = -2.769,    // TVOC Power curve B constant
-                             // ----------------------------------
+    .mq_rl_kohm = 10.0,
+    .mq_r0_ratio_clean = 3.6,
+    .tvoc_a_curve = 116.602,
+    .tvoc_b_curve = -2.769,
+    .mq_rzero = 0,
 
-  .deviceId = "01",
-  .latitude = 21.5,
-  .longitude =105.8,
+    .deviceId = "01",
+    .latitude = 21.5,
+    .longitude = 105.8,
 };
 
-/**
- * @brief Resets the current configuration to default values and saves it to NVS.
- */
 void resetConfig() {
-  Serial.println("[CFG] Resetting config to default values...");
-  // Copy the contents of defaultConfig to the global appConfig variable
-  memcpy(&appConfig, &defaultConfig, sizeof(AppConfig_t));
-  saveConfig();
+    addLog("[CFG] Resetting to default config...");
+    memcpy(&appConfig, &defaultConfig, sizeof(AppConfig_t));
+    saveConfig();
 }
 
-/**
- * @brief Saves the current content of appConfig structure to the ESP32's NVS (Non-Volatile Storage).
- */
 void saveConfig() {
-  preferences.begin(PREFERENCES_NAMESPACE, false);  // Read/Write access
-  preferences.putBytes("config", &appConfig, sizeof(AppConfig_t));
-  preferences.end();
-  Serial.println("[CFG] Configuration saved successfully to NVS.");
+    preferences.begin(PREFERENCES_NAMESPACE, false);
+    preferences.putBytes("config", &appConfig, sizeof(AppConfig_t));
+    preferences.end();
+
+    addLog("[CFG] Configuration saved to NVS");
 }
 
-/**
- * @brief Loads the configuration from NVS into the appConfig structure. If no valid config is found, it loads the default config and saves it.
- */
 void loadConfig() {
-  preferences.begin(PREFERENCES_NAMESPACE, true);  // Read-only access
-  size_t configSize = preferences.getBytesLength("config");
+    preferences.begin(PREFERENCES_NAMESPACE, true);
+    size_t savedSize = preferences.getBytesLength("config");
 
-  // Check if the stored size matches the expected size of the structure
-  if (configSize == sizeof(AppConfig_t)) {
-    preferences.getBytes("config", &appConfig, sizeof(AppConfig_t));
-    Serial.println("[CFG] Loaded configuration from NVS.");
-  } else {
-    Serial.println("[CFG] No valid configuration found in NVS. Using default.");
-    // If config is missing or invalid size, reset to default and save it
-    resetConfig();
-  }
-  preferences.end();
+    if (savedSize == sizeof(AppConfig_t)) {
+        preferences.getBytes("config", &appConfig, sizeof(AppConfig_t));
+        addLog("[CFG] Configuration loaded from NVS");
+    } else {
+        addLog("[CFG] No valid config found in NVS — loading defaults");
+        resetConfig();
+    }
+
+    preferences.end();
+}
+
+void addLog(const char* msg) {
+    Serial.println(msg);
+
+    logBuffer[logIndex].message = msg;
+    logIndex = (logIndex + 1) % LOG_BUFFER_SIZE;
+
+    StaticJsonDocument<256> doc;
+    doc["type"] = "log";
+    doc["msg"] = msg;
+
+    String json;
+    serializeJson(doc, json);
+
+    ws.textAll(json);
+}
+
+void addLogf(const char* format, ...) {
+    char buf[256];
+
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buf, sizeof(buf), format, args);
+    va_end(args);
+
+    addLog(buf);
 }
