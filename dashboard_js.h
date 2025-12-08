@@ -131,9 +131,9 @@ ws.onmessage = e=>{
         addData(dustData,ts_us,d.pm);
         chartDust.update();
     }
-    if(d.mq!==undefined){
-        document.getElementById('mqVal').innerText=d.mq.toFixed(0); 
-        addData(mqData,ts_us,d.mq);
+    if(d.mqr!==undefined){
+        document.getElementById('mqVal').innerText=d.mqr.toFixed(0); 
+        addData(mqData,ts_us,d.mqr);
         chartMQ.update();
     }
     if(d.aqi!==undefined){
