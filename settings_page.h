@@ -32,11 +32,11 @@ button:hover{background:#27ae60;}
 <div class="form-row"><label for="latitude">Latitude:</label><input type="number" step="0.000001" id="latitude" name="latitude"></div>
 <div class="form-row"><label for="longitude">Longitude:</label><input type="number" step="0.000001" id="longitude" name="longitude"></div>
 <div class="form-row"><label for="wifiSSID">WiFi SSID:</label><input type="text" id="wifiSSID" name="wifiSSID"></div>
-<div class="form-row"><label for="wifiPass">WiFi Password:</label><input type="password" id="wifiPass" name="wifiPass"></div>
+<div class="form-row"><label for="wifiPass">WiFi Password:</label><input type="text" id="wifiPass" name="wifiPass"></div>
 <div class="form-row"><label for="mqttServer">MQTT Server:</label><input type="text" id="mqttServer" name="mqttServer"></div>
 <div class="form-row"><label for="mqttPort">MQTT Port:</label><input type="number" id="mqttPort" name="mqttPort"></div>
 <div class="form-row"><label for="mqttUser">MQTT User:</label><input type="text" id="mqttUser" name="mqttUser"></div>
-<div class="form-row"><label for="mqttPass">MQTT Pass:</label><input type="password" id="mqttPass" name="mqttPass"></div>
+<div class="form-row"><label for="mqttPass">MQTT Pass:</label><input type="text" id="mqttPass" name="mqttPass"></div>
 <div class="form-row"><label for="mqttTopic">MQTT Topic:</label><input type="text" id="mqttTopic" name="mqttTopic"></div>
 <div class="form-row"><label for="sendInterval">Send Interval (ms):</label><input type="number" id="sendInterval" name="sendInterval"></div>
 <div class="form-row"><label for="ntpServer">NTP Server:</label><input type="text" id="ntpServer" name="ntpServer"></div>

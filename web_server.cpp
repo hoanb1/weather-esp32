@@ -115,9 +115,11 @@ void setupWebServer() {
     doc["latitude"] = appConfig.latitude;
     doc["longitude"] = appConfig.longitude;
     doc["wifiSSID"] = appConfig.wifiSSID;
+    doc["wifiPass"] = appConfig.wifiPass;
     doc["mqttServer"] = appConfig.mqttServer;
     doc["mqttPort"] = appConfig.mqttPort;
     doc["mqttUser"] = appConfig.mqttUser;
+    doc["mqttPass"] = appConfig.mqttPass;
     doc["mqttTopic"] = appConfig.mqttTopic;
     doc["sendInterval"] = appConfig.sendInterval;
     doc["ntpServer"] = appConfig.ntpServer;

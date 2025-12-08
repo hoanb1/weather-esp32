@@ -85,3 +85,11 @@ Data is published as a JSON string containing the measured and calculated values
   "aqi": 58,               // Total AQI (from PM2.5) - int
   "ts": 1678886400123456   // Timestamp (microseconds) - uint64_t
 }
+
+## 📸 Screenshots
+
+### Web Dashboard
+![Web Dashboard](images/2s.png)
+
+### Device Configuration Page
+![Device Settings](images/s1.png)

@@ -38,7 +38,7 @@ nav a{color:white;text-decoration:none;margin-left:10px;}
 <div class="card"><h4>MQ (ADC)</h4><div id="mqVal">--</div><canvas id="chartMQ"></canvas></div>
 <div class="card"><h4>AQI</h4><div id="aqiVal">--</div><canvas id="chartAQI"></canvas></div>
 </div>
-0.
+
 <div id="logArea"></div>
 <script src="dashboard.js"></script>
 </body>
