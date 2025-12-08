@@ -1,10 +1,16 @@
+//weather-esp32.ino
+
 #include <Arduino.h>
 #include <WiFiClient.h>
 #include <PubSubClient.h>
 #include <ESPAsyncWebServer.h>
+#include <ArduinoOTA.h>
+
 #include "config.h"
 #include "data.h"
+#include "ota_update.h"
 #include "MQ135_ESP32.h"
+
 
 // --- Global Objects ---
 WiFiClient wifiClient;
@@ -63,53 +69,66 @@ void setup() {
   Serial.begin(115200);
   addLog("--- Starting ESP32 Weather Station ---");
 
+  // Load config và log cấu hình cơ bản
   loadConfig();
   logAppConfig();
 
+  // WiFi
   addLog("[INIT] WiFi...");
   setupWiFi();
+  addLogf("[DEBUG] WiFi connected? %d, IP: %s",
+          isWifiConnected,
+          isWifiConnected ? WiFi.localIP().toString().c_str() : "N/A");
 
+  // Web server
   addLog("[INIT] Web server...");
   setupWebServer();
+  setupOTA();
 
+  // Dust sensor
   addLog("[INIT] Dust sensor...");
   initDustSensor();
+  float baseline = dustSensor->getBaselineCandidate();
+  dustSensor->setBaseline(baseline);
+  addLogf("[BASELINE] Dust baseline set to %.4f", dustSensor->getBaseline());
 
+  // MQ135 sensor
   addLog("[INIT] MQ135 sensor...");
   initMQ135();
+  addLogf("[DEBUG] MQ135 warming up? %d", mq135->isWarmingUp());
 
+  // BME280
   addLog("[INIT] BME280...");
   if (!bme.begin(0x76)) {
     addLog("[ERROR] BME280 not found");
     bmeInitialized = false;
   } else {
-    addLog("BME280 initialized");
     bmeInitialized = true;
+    addLog("[INFO] BME280 initialized");
   }
 
-  float baseline = dustSensor->getBaselineCandidate();
-  dustSensor->setBaseline(baseline);
-  addLogf("[BASELINE] Dust baseline set to %.4f", baseline);
-
-  addLog("[MQ135] Warmup...");
-
-
+  // Time
   addLog("[INIT] Time sync...");
   setupTime();
 
+  // MQTT
   addLogf("[INIT] MQTT server: %s:%d", appConfig.mqttServer, appConfig.mqttPort);
   mqttClient.setServer(appConfig.mqttServer, appConfig.mqttPort);
+  addLogf("[DEBUG] MQTT connected? %d", mqttClient.connected());
 
   addLog("--- Setup Complete ---");
 }
 
 void loop() {
+  // WiFi & MQTT maintenance
   maintainWiFi();
   reconnectMQTT();
   mqttClient.loop();
+
+  ArduinoOTA.handle();
   ws.cleanupClients();
 
-  // Dust baseline adjustment
+  // Dust baseline adjustment mỗi phút
   static unsigned long lastBaselineCheck = 0;
   if (millis() - lastBaselineCheck > 60000) {
     float candidate = dustSensor->getBaselineCandidate();
@@ -120,13 +139,13 @@ void loop() {
     lastBaselineCheck = millis();
   }
 
+  // MQ135 warmup và calibration (log tối giản)
   mq135->warmupLoop();
-
   if (!mq135->isWarmingUp()) {
     processMQ135Calibration(*mq135);
   }
 
-  // Send data
+  // Gửi dữ liệu theo interval
   if (millis() - lastSend >= appConfig.sendInterval) {
     latestJson = getDataJson();
     notifyClients(latestJson);
@@ -135,6 +154,9 @@ void loop() {
       if (!mqttClient.publish(appConfig.mqttTopic, latestJson.c_str())) {
         addLogf("[MQTT] Publish FAILED. State=%d", mqttClient.state());
       }
+      //else {
+      //addLog("[MQTT] Data published successfully");
+      //}
     } else if (isWifiConnected) {
       addLog("[MQTT] Not connected. Data not published.");
     }
