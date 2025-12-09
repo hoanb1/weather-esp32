@@ -1,28 +1,29 @@
-// config_manager.cpp
-
 #include <Arduino.h>
 #include <Preferences.h>
 #include <ArduinoJson.h>
 #include <cstdarg>
 
-#include "data.h"
 #include "config.h"
+#include "data.h"
 
+// --- Global Instances ---
 AppConfig_t appConfig;
 Preferences preferences;
 
 LogEntry logBuffer[LOG_BUFFER_SIZE];
 uint8_t logIndex = 0;
 
-// Default Configuration
+// --- Default Config ---
 const AppConfig_t defaultConfig = {
     .wifiSSID = "HH",
     .wifiPass = "12345678",
+
     .mqttServer = "pi.hoan.uk",
     .mqttPort = 1883,
     .mqttUser = "sensor",
     .mqttPass = "pass1234",
     .mqttTopic = "weather/data",
+
     .sendInterval = 5000,
     .ntpServer = "pool.ntp.org",
 
@@ -32,8 +33,6 @@ const AppConfig_t defaultConfig = {
 
     .mq_rl_kohm = 10.0,
     .mq_r0_ratio_clean = 3.6,
-    .tvoc_a_curve = 116.602,
-    .tvoc_b_curve = -2.769,
     .mq_rzero = 0,
 
     .deviceId = "01",
@@ -41,20 +40,22 @@ const AppConfig_t defaultConfig = {
     .longitude = 105.8,
 };
 
+// --- Reset config to defaults ---
 void resetConfig() {
-    addLog("[CFG] Resetting to default config...");
+    addLog("[CFG] Resetting to default configuration...");
     memcpy(&appConfig, &defaultConfig, sizeof(AppConfig_t));
     saveConfig();
 }
 
+// --- Save config to NVS ---
 void saveConfig() {
     preferences.begin(PREFERENCES_NAMESPACE, false);
     preferences.putBytes("config", &appConfig, sizeof(AppConfig_t));
     preferences.end();
-
     addLog("[CFG] Configuration saved to NVS");
 }
 
+// --- Load config from NVS ---
 void loadConfig() {
     preferences.begin(PREFERENCES_NAMESPACE, true);
     size_t savedSize = preferences.getBytesLength("config");
@@ -63,13 +64,14 @@ void loadConfig() {
         preferences.getBytes("config", &appConfig, sizeof(AppConfig_t));
         addLog("[CFG] Configuration loaded from NVS");
     } else {
-        addLog("[CFG] No valid config found in NVS — loading defaults");
+        addLog("[CFG] No valid config in NVS — loading defaults");
         resetConfig();
     }
 
     preferences.end();
 }
 
+// --- Logging ---
 void addLog(const char* msg) {
     Serial.println(msg);
 
@@ -83,12 +85,12 @@ void addLog(const char* msg) {
     String json;
     serializeJson(doc, json);
 
+    // Send to WebSocket if server active
     ws.textAll(json);
 }
 
 void addLogf(const char* format, ...) {
     char buf[256];
-
     va_list args;
     va_start(args, format);
     vsnprintf(buf, sizeof(buf), format, args);

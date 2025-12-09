@@ -19,6 +19,19 @@
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
+// --- WebSocket ---
+void onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
+               AwsEventType type, void* arg, uint8_t* data, size_t len) {
+  if (type == WS_EVT_CONNECT) {
+    addLogf("WS: Client #%u connected", client->id());
+    client->text(latestJson);
+  }
+}
+
+void notifyClients(String json) {
+  ws.textAll(json);
+}
+
 // ======== Reboot / Reset handlers ========
 void handleReboot(AsyncWebServerRequest *request) {
   request->send(200, "text/html", "<html><body>Rebooting...</body></html>");
@@ -128,8 +141,8 @@ void setupWebServer() {
     doc["mqADCPin"] = appConfig.mqADCPin;
     doc["mq_rl_kohm"] = appConfig.mq_rl_kohm;
     doc["mq_r0_ratio_clean"] = appConfig.mq_r0_ratio_clean;
-    doc["tvoc_a_curve"] = appConfig.tvoc_a_curve;
-    doc["tvoc_b_curve"] = appConfig.tvoc_b_curve;
+    doc["mq_rzero"] = appConfig.mq_rzero;
+
 
     String jsonConfig;
     serializeJson(doc, jsonConfig);
@@ -171,6 +184,54 @@ void setupWebServer() {
       delay(1000);
       ESP.restart();
     });
+
+   server.on("/calibrate-mq135", HTTP_GET, [](AsyncWebServerRequest *request) {
+
+    String page = R"HTML(
+        <html><body style='font-family:Arial;padding:20px;'>
+        <h2>Calibrate MQ135</h2>
+        <button onclick="startCalibrate()" style='padding:10px;font-size:18px;'>Start Calibration</button>
+        <pre id='log' style='background:#000;color:#0f0;padding:10px;margin-top:20px;height:200px;overflow:auto;'></pre>
+        <script>
+        function startCalibrate(){
+            document.getElementById('log').innerText = "Calibrating...";
+            fetch('/api/mq135/calibrate')
+                .then(r => r.text())
+                .then(t => {
+                    document.getElementById('log').innerText = t;
+                });
+        }
+        </script>
+        </body></html>
+    )HTML";
+
+    request->send(200, "text/html", page);
+});
+
+server.on("/api/mq135/calibrate", HTTP_GET, [](AsyncWebServerRequest *request) {
+    float temp = NAN, hum = NAN;
+
+    if (bmeInitialized) {
+        temp = bme.readTemperature();
+        hum  = bme.readHumidity();
+    }
+
+    if (!isfinite(temp) || !isfinite(hum)) {
+        request->send(500, "text/plain", "BME280 not ready");
+        return;
+    }
+
+    float r0 = mq135->autoCalibrate(temp, hum);
+
+    if (isfinite(r0)) {
+        appConfig.mq_rzero = r0;
+        saveConfig();
+        request->send(200, "text/plain", "Calibration OK\nRZERO=" + String(r0, 3));
+    } else {
+        request->send(500, "text/plain", "Calibration failed");
+    }
+});
+
 
   server.on("/reboot", HTTP_GET, handleReboot);
   server.on("/reset", HTTP_GET, handleReset);

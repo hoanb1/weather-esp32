@@ -7,22 +7,19 @@
 #include <PubSubClient.h>
 #include <Adafruit_BME280.h>
 #include <GP2YDustSensor.h>
-
+#include "mq135.h"
 #include "config.h"
-#include "MQ135_ESP32.h"
 
-// -----------------------------------------------------------------------------
-// External Objects
-// -----------------------------------------------------------------------------
-extern AsyncWebServer server;
-extern AsyncWebSocket ws;
-
-extern WiFiClient espClient;
-extern PubSubClient mqttClient;
-
+// --- Global Sensor Instances ---
 extern Adafruit_BME280 bme;
 extern GP2YDustSensor* dustSensor;
-extern MQ135_ESP32* mq135;
+extern MQ135* mq135;
+
+// --- External Objects ---
+extern AsyncWebServer server;
+extern AsyncWebSocket ws;
+extern WiFiClient espClient;
+extern PubSubClient mqttClient;
 
 extern AppConfig_t appConfig;
 extern String latestJson;
@@ -30,51 +27,31 @@ extern unsigned long lastSend;
 extern bool isWifiConnected;
 extern bool bmeInitialized;
 
-// -----------------------------------------------------------------------------
-// Data & Sensor Handling
-// -----------------------------------------------------------------------------
+// --- Data & Sensor Handling ---
 String getDataJson();
-int calcAQI(float pm25);
+int calcAQI_PM25(float pm25);
 
-// -----------------------------------------------------------------------------
-// Time
-// -----------------------------------------------------------------------------
+// --- Time ---
 void setupTime();
 
-// -----------------------------------------------------------------------------
-// Dust Sensor
-// -----------------------------------------------------------------------------
+// --- Dust Sensor ---
 void initDustSensor();
 
-// -----------------------------------------------------------------------------
-// Web / WebSocket
-// -----------------------------------------------------------------------------
+// --- Web / WebSocket ---
 void notifyClients(String msg);
 void setupWebServer();
-void onWsEvent(AsyncWebSocket* server,
-                AsyncWebSocketClient* client,
-                AwsEventType type,
-                void* arg,
-                uint8_t* data,
-                size_t len);
-
+void onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
+               AwsEventType type, void* arg, uint8_t* data, size_t len);
 void handleReboot(AsyncWebServerRequest* request);
 void handleReset(AsyncWebServerRequest* request);
 
-// -----------------------------------------------------------------------------
-// WiFi
-// -----------------------------------------------------------------------------
+// --- WiFi ---
 void setupWiFi();
 void maintainWiFi();
 
-// -----------------------------------------------------------------------------
-// MQTT
-// -----------------------------------------------------------------------------
+// --- MQTT ---
 void reconnectMQTT();
 
-// -----------------------------------------------------------------------------
-// MQ135
-// -----------------------------------------------------------------------------
+// --- MQ135 ---
 void initMQ135();
-void startMQ135Calibration();
-void processMQ135Calibration(MQ135_ESP32& sensor);
+float calibrateMQ135();
