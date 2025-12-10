@@ -23,6 +23,7 @@ const AppConfig_t defaultConfig = {
     .mqttUser = "sensor",
     .mqttPass = "pass1234",
     .mqttTopic = "weather/data",
+    .mqttEnabled = true,
 
     .sendInterval = 5000,
     .ntpServer = "pool.ntp.org",

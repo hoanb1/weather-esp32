@@ -81,77 +81,102 @@ const chartAQI = createChart(document.getElementById("chartAQI").getContext("2d"
 const chartMQ = createChart(document.getElementById("chartMQ").getContext("2d"), mqData, '#f39c12', 'MQ Index');
 
 // WebSocket data flow
-let ws = new WebSocket("ws://" + location.hostname + "/ws");
 
-ws.onmessage = e=>{
-    const d = JSON.parse(e.data);
-    const ts = d.ts;
+let ws;
 
-    if(d.t !== undefined && d.h !== undefined){
-        document.getElementById("tempHumVal").innerText =
-            d.t.toFixed(1) + "°C / " + d.h.toFixed(1) + "%";
-        addData(tempData, ts, d.t);
-        addData(humData, ts, d.h);
-        chartTempHum.update();
-    }
+function connectWS() {
+    ws = new WebSocket("ws://" + location.hostname + "/ws");
 
-    if(d.p !== undefined){
-        document.getElementById("presVal").innerText = d.p.toFixed(1) + " hPa";
-        addData(presData, ts, d.p);
-        chartPres.update();
-    }
+    ws.onopen = () => {
+        console.log("WebSocket connected");
+    };
 
-    if(d.pm !== undefined){
-        document.getElementById("dustVal").innerText =
-            d.pm.toFixed(1) + " µg/m³";
-        addData(dustData, ts, d.pm);
-        chartDust.update();
-    }
+    ws.onmessage = e=>{
+        const d = JSON.parse(e.data);
+        const ts = d.ts;
 
-    if(d.aqi !== undefined){
-        document.getElementById("aqiVal").innerText = d.aqi;
-        addData(aqiData, ts, d.aqi);
-        chartAQI.update();
-    }
-
-    if(d.mq !== undefined){
-        document.getElementById("mqVal").innerText = d.mq;
-        addData(mqData, ts, d.mq);
-        chartMQ.update();
-    }
-
-    if(d.msg !== undefined){
-        let log=document.getElementById("logArea");
-        log.innerText += d.msg + "\n";
-        log.scrollTop = log.scrollHeight;
-    }
-
-    if(d.uptime_seconds !== undefined || d.status_msg !== undefined){
-
-        if(d.uptime_seconds !== undefined){
-            const uptime = d.uptime_seconds;
-            const h = Math.floor(uptime / 3600);
-            const m = Math.floor((uptime % 3600) / 60);
-            const s = Math.floor(uptime % 60);
-            
-            let rssi = d.wifi_rssi !== undefined ? ` | RSSI: ${d.wifi_rssi} dBm` : '';
-
-            document.getElementById('sysInfoVal').innerText = `Uptime: ${h}h ${m}m ${s}s${rssi}`;
+        if(d.t !== undefined && d.h !== undefined){
+            document.getElementById("tempHumVal").innerText =
+                d.t.toFixed(1) + "°C / " + d.h.toFixed(1) + "%";
+            addData(tempData, ts, d.t);
+            addData(humData, ts, d.h);
+            chartTempHum.update();
         }
 
-        if(d.status_msg !== undefined){
-            const statusEl = document.getElementById('statusIndicator');
-            statusEl.innerText = d.status_msg;
-            
-            if (d.status_msg.includes("Connected")) {
-                 statusEl.style.color = 'green';
-            } else if (d.status_msg.includes("Connecting")) {
-                 statusEl.style.color = '#f39c12'; 
-            } else {
-                 statusEl.style.color = 'red';
+        if(d.p !== undefined){
+            document.getElementById("presVal").innerText = d.p.toFixed(1) + " hPa";
+            addData(presData, ts, d.p);
+            chartPres.update();
+        }
+
+        if(d.pm !== undefined){
+            document.getElementById("dustVal").innerText =
+                d.pm.toFixed(1) + " µg/m³";
+            addData(dustData, ts, d.pm);
+            chartDust.update();
+        }
+
+        if(d.aqi !== undefined){
+            document.getElementById("aqiVal").innerText = d.aqi;
+            addData(aqiData, ts, d.aqi);
+            chartAQI.update();
+        }
+
+        if(d.mq !== undefined){
+            document.getElementById("mqVal").innerText = d.mq;
+            addData(mqData, ts, d.mq);
+            chartMQ.update();
+        }
+
+        if(d.msg !== undefined){
+            let log=document.getElementById("logArea");
+            log.innerText += d.msg + "\n";
+            log.scrollTop = log.scrollHeight;
+        }
+
+        if(d.uptime_seconds !== undefined || d.status_msg !== undefined){
+
+            if(d.uptime_seconds !== undefined){
+                const uptime = d.uptime_seconds;
+                const h = Math.floor(uptime / 3600);
+                const m = Math.floor((uptime % 3600) / 60);
+                const s = Math.floor(uptime % 60);
+                
+                let rssi = d.wifi_rssi !== undefined ? ` | RSSI: ${d.wifi_rssi} dBm` : '';
+
+                document.getElementById('sysInfoVal').innerText = `Uptime: ${h}h ${m}m ${s}s${rssi}`;
+            }
+
+            if(d.status_msg !== undefined){
+                const statusEl = document.getElementById('statusIndicator');
+                statusEl.innerText = d.status_msg;
+                
+                if (d.status_msg.includes("Connected")) {
+                    statusEl.style.color = 'green';
+                } else if (d.status_msg.includes("Connecting")) {
+                    statusEl.style.color = '#f39c12'; 
+                } else {
+                    statusEl.style.color = 'red';
+                }
             }
         }
     }
+
+    ws.onclose = e => {
+        console.log("WebSocket closed, reconnecting in 2s...");
+        
+        let log=document.getElementById("logArea");
+        log.innerText +=  "WebSocket closed, reconnecting in 2s...\n";
+        log.scrollTop = log.scrollHeight;
+        setTimeout(connectWS, 2000);
+    };
+
+    ws.onerror = e => {
+        console.log("WebSocket error", e);
+        ws.close();
+    };
 }
+
+connectWS();
 
 )rawliteral";

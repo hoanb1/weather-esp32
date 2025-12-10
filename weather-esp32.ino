@@ -74,15 +74,21 @@ void setup() {
   setupTime();
 
   // MQTT
-  mqttClient.setServer(appConfig.mqttServer, appConfig.mqttPort);
-
+  if (!appConfig.mqttEnabled) {
+    addLog("[MQTT] Disabled, skipping publish");
+  } else {
+    mqttClient.setServer(appConfig.mqttServer, appConfig.mqttPort);
+  }
   addLog("=== Setup Complete ===");
 }
 
 void loop() {
   // WiFi & MQTT
   maintainWiFi();
-  reconnectMQTT();
+  
+  if (appConfig.mqttEnabled) {
+    reconnectMQTT();
+  }
   mqttClient.loop();
 
   // OTA
@@ -105,7 +111,7 @@ void loop() {
     latestJson = getDataJson();
     notifyClients(latestJson);
 
-    if (mqttClient.connected()) {
+    if (appConfig.mqttEnabled && mqttClient.connected()) {
       if (!mqttClient.publish(appConfig.mqttTopic, latestJson.c_str())) {
         addLogf("[MQTT] Publish FAILED. State=%d", mqttClient.state());
       }

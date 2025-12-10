@@ -18,6 +18,7 @@ typedef struct {
     char mqttUser[32];
     char mqttPass[64];
     char mqttTopic[64];
+    bool mqttEnabled;
 
     // Timing
     uint32_t sendInterval;

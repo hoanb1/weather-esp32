@@ -24,19 +24,19 @@ body {
 .navbar {
     background: #2c3e50;
     color: white;
-    padding: 15px 20px;
+    padding: 10px 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 .navbar-title {
-    font-size: 1.2em;
+    font-size: 1.1em;
     margin: 0;
 }
 .nav-links {
     display: flex;
-    gap: 20px;
+    gap: 10px;
 }
 .nav-links a {
     color: white;
@@ -73,7 +73,7 @@ body {
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
 }
 .card-header {
-    font-size: 1.2em;
+    font-size: 1em;
     margin-top: 0;
     margin-bottom: 10px;
     color: #2c3e50;
@@ -81,7 +81,7 @@ body {
     padding-bottom: 5px;
 }
 .current-value {
-    font-size: 2em;
+    font-size: 1em;
     font-weight: bold;
     color: #3498db;
     margin-bottom: 15px;
@@ -119,7 +119,7 @@ canvas {
   <div class="nav-links">
     <a href="/settings">Settings</a>
     <a href="/ota">OTA</a>
-    <a href="/calibrate-mq135">MQ135 Cali</a>
+    <a href="/calibrate-mq135">MQ135</a>
   </div>
 </header>
 

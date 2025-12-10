@@ -137,6 +137,8 @@ void setupWebServer() {
     doc["mqttUser"] = appConfig.mqttUser;
     doc["mqttPass"] = appConfig.mqttPass;
     doc["mqttTopic"] = appConfig.mqttTopic;
+    doc["mqttEnabled"] = appConfig.mqttEnabled;
+
     doc["sendInterval"] = appConfig.sendInterval;
     doc["ntpServer"] = appConfig.ntpServer;
     doc["dustLEDPin"] = appConfig.dustLEDPin;
@@ -179,6 +181,9 @@ void setupWebServer() {
       if (doc.containsKey("mqttUser")) strncpy(appConfig.mqttUser, doc["mqttUser"], sizeof(appConfig.mqttUser));
       if (doc.containsKey("mqttPass")) strncpy(appConfig.mqttPass, doc["mqttPass"], sizeof(appConfig.mqttPass));
       if (doc.containsKey("mqttTopic")) strncpy(appConfig.mqttTopic, doc["mqttTopic"], sizeof(appConfig.mqttTopic));
+      if (doc.containsKey("mqttEnabled")) appConfig.mqttEnabled = doc["mqttEnabled"].as<bool>();
+
+
       if (doc.containsKey("sendInterval")) appConfig.sendInterval = doc["sendInterval"].as<uint32_t>();
       if (doc.containsKey("ntpServer")) strncpy(appConfig.ntpServer, doc["ntpServer"], sizeof(appConfig.ntpServer));
       if (doc.containsKey("mq_rl_kohm")) appConfig.mq_rl_kohm = doc["mq_rl_kohm"].as<float>();
@@ -187,6 +192,7 @@ void setupWebServer() {
       if (doc.containsKey("dustLEDPin")) appConfig.dustLEDPin = doc["dustLEDPin"].as<uint8_t>();
       if (doc.containsKey("dustADCPin")) appConfig.dustADCPin = doc["dustADCPin"].as<uint8_t>();
       if (doc.containsKey("mqADCPin")) appConfig.mqADCPin = doc["mqADCPin"].as<uint8_t>();
+
 
 
       saveConfig();

@@ -18,10 +18,14 @@ h3{color:#34495e;margin-top:20px;padding-bottom:5px;border-bottom:1px dashed #cc
 .form-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
 .form-row label{width:45%;font-weight:600;color:#555;}
 .form-row input[type=text],.form-row input[type=password],.form-row input[type=number]{width:50%;padding:10px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;}
-.btn-primary{background:#3498db;color:white;padding:12px 20px;border:none;border-radius:6px;cursor:pointer;margin-top:20px;font-size:16px;transition:background 0.3s;}
+.btn-primary{background:#3498db;color:white;padding:12px 20px;border:none;border-radius:6px;cursor:pointer;font-size:16px;transition:background 0.3s;}
 .btn-primary:hover{background:#2980b9;}
-.btn-group{display:flex;justify-content:flex-end;margin-top:20px;}
-.btn-group button{margin-left:10px;padding:10px 15px;}
+.btn-group{display:flex;justify-content:flex-end;}
+.btn-group button{ margin-left:10px;
+    padding:12px 20px;
+    font-size:12px;   
+    border-radius:6px;
+    cursor:pointer;}
 .btn-warning{background:#e74c3c;}
 .btn-warning:hover{background:#c0392b;}
 .status{margin-bottom:20px;font-weight:bold;padding:12px;border-radius:6px;background:#ecf0f1;border-left:5px solid #3498db;}
@@ -44,6 +48,11 @@ h3{color:#34495e;margin-top:20px;padding-bottom:5px;border-bottom:1px dashed #cc
 <div class="form-row"><label for="ntpServer">NTP Server:</label><input type="text" id="ntpServer" name="ntpServer"></div>
 
 <h3>MQTT Settings</h3>
+<div class="form-row">
+  <label for="mqttEnabled">Enable MQTT:</label>
+  <input type="checkbox" id="mqttEnabled" name="mqttEnabled">
+</div>
+
 <div class="form-row"><label for="mqttServer">MQTT Server:</label><input type="text" id="mqttServer" name="mqttServer"></div>
 <div class="form-row"><label for="mqttPort">MQTT Port:</label><input type="number" id="mqttPort" name="mqttPort"></div>
 <div class="form-row"><label for="mqttUser">MQTT User:</label><input type="text" id="mqttUser" name="mqttUser"></div>
@@ -59,14 +68,14 @@ h3{color:#34495e;margin-top:20px;padding-bottom:5px;border-bottom:1px dashed #cc
 <div class="form-row"><label for="mq_r0_ratio_clean">MQ R0 ratio:</label><input type="number" step="0.001" id="mq_r0_ratio_clean" name="mq_r0_ratio_clean"></div>
 <div class="form-row"><label for="mq_rzero">MQ RZERO:</label><input type="number" step="0.01" id="mq_rzero" name="mq_rzero"></div>
 
-<button type="submit" class="btn-primary">Save & Reboot</button>
-</form>
-
 <div class="btn-group">
-<button onclick="window.location.href='/'" class="btn-primary">Dashboard</button>
+<button type="submit" class="btn-primary">Save & Reboot</button>
+
 <button class="btn-warning" onclick="if(confirm('Are you sure you want to reboot the device?')) window.location.href='/reboot'">Reboot</button>
 <button class="btn-warning" onclick="if(confirm('WARNING: This will erase ALL configuration and restart. Continue?')) window.location.href='/reset'">Factory Reset</button>
 </div>
+
+</form>
 
 <script>
 const configData = JSON.parse(')rawliteral"
@@ -75,11 +84,14 @@ const configData = JSON.parse(')rawliteral"
 for(const key in configData) {
     const input = document.getElementById(key);
     if(input) {
-        input.value=configData[key];
-        // Special handling for password fields to clear them on load for security
-        if (input.type === 'password' && input.value !== "") {
-            input.placeholder = '****** (Set)';
-            input.value = '';
+        if(input.type === 'checkbox') {
+            input.checked = configData[key] === true || configData[key] === "true";
+        } else {
+            input.value = configData[key];
+            if (input.type === 'password' && input.value !== "") {
+                input.placeholder = '****** (Set)';
+                input.value = '';
+            }
         }
     }
 }
@@ -87,24 +99,29 @@ for(const key in configData) {
 document.getElementById('configForm').onsubmit = function(e){
     e.preventDefault();
     const data = {};
-    const formData = new FormData(this);
-    
-    for (const [key, value] of formData.entries()) {
-        const input = document.getElementById(key);
-        // If password field is empty, skip sending it to keep old password
-        if (input.type === 'password' && value === '') continue; 
-        
-        data[key] = value;
-        
-        // Convert numbers/floats
-        if (input.type === 'number' || input.step === '0.000001' || input.step === '0.01' || input.step === '0.001') {
-            data[key] = parseFloat(value);
+
+    for (const input of this.elements) {
+        if (!input.name) continue; 
+
+        if (input.type === 'checkbox') {
+            data[input.name] = input.checked; 
+        } else if (input.type === 'number') {
+            data[input.name] = parseFloat(input.value);
+        } else if (input.type === 'password') {
+            if(input.value !== '') data[input.name] = input.value; 
+        } else {
+            data[input.name] = input.value;
         }
     }
-    
-    fetch('/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+
+    fetch('/save',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(data)
+    })
     .then(r=>r.text()).then(t=>alert(t));
 };
+
 </script>
 </div>
 </body>
