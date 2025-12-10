@@ -15,8 +15,8 @@ uint8_t logIndex = 0;
 
 // --- Default Config ---
 const AppConfig_t defaultConfig = {
-  .wifiSSID = "",
-  .wifiPass = "",
+  .wifiSSID = "HH",
+  .wifiPass = "12345678",
 
   .mqttServer = "pi.hoan.uk",
   .mqttPort = 1883,
