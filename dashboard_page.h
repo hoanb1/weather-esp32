@@ -31,7 +31,7 @@ body {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 .navbar-title {
-    font-size: 1.5em;
+    font-size: 1.2em;
     margin: 0;
 }
 .nav-links {
