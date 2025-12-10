@@ -119,7 +119,7 @@ canvas {
   <div class="nav-links">
     <a href="/settings">Settings</a>
     <a href="/ota">OTA</a>
-    <a href="/calibrate-mq135">MQ135</a>
+    <a href="/calibrate">Calibrate</a>
   </div>
 </header>
 

@@ -9,6 +9,7 @@
 #include "data.h"
 #include "ota_update.h"
 #include "mq135.h"
+#include "calibrate.h"
 
 // --- Global Objects ---
 const unsigned long SYSTEM_INFO_INTERVAL = 10000;
@@ -50,16 +51,6 @@ void setup() {
   setupWebServer();
   setupOTA();
 
-  // Dust sensor
-  initDustSensor();
-  if (dustSensor) {
-    float baseline = dustSensor->getBaselineCandidate();
-    dustSensor->setBaseline(baseline);
-    addLogf("[BASELINE] Dust baseline set to %.4f", dustSensor->getBaseline());
-  }
-
-  // MQ135 sensor
-  initMQ135();
 
   // BME280
   if (!bme.begin(0x76)) {
@@ -69,6 +60,17 @@ void setup() {
     bmeInitialized = true;
     addLog("[INFO] BME280 initialized");
   }
+
+    // Dust sensor
+  initDustSensor();
+  // MQ135 sensor
+  initMQ135();
+
+  // Auto calibrate 
+  if (appConfig.autoCalibrateOnBoot) {
+    startCalibration();
+  }
+
 
   // Time sync
   setupTime();
@@ -85,26 +87,16 @@ void setup() {
 void loop() {
   // WiFi & MQTT
   maintainWiFi();
-  
+
   if (appConfig.mqttEnabled) {
     reconnectMQTT();
+    mqttClient.loop();
   }
-  mqttClient.loop();
+
 
   // OTA
   ArduinoOTA.handle();
   ws.cleanupClients();
-
-  // Dust baseline adjustment
-  static unsigned long lastBaselineCheck = 0;
-  if (millis() - lastBaselineCheck > 60000 && dustSensor) {
-    float candidate = dustSensor->getBaselineCandidate();
-    if (candidate < dustSensor->getBaseline()) {
-      dustSensor->setBaseline(candidate);
-      addLogf("[BASELINE] Adjusted: %.4f", candidate);
-    }
-    lastBaselineCheck = millis();
-  }
 
   // Send data
   if (millis() - lastSend >= appConfig.sendInterval) {

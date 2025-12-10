@@ -9,10 +9,13 @@
 
 #include "config.h"  // appConfig
 #include "data.h"    // ws, server, onWsEvent, isWifiConnected
+#include "calibrate.h"
 
 #include "settings_page.h"
 #include "dashboard_page.h"
 #include "dashboard_js.h"
+#include "ota_update.h"
+
 
 #include <Update.h>
 
@@ -63,6 +66,10 @@ void setupWebServer() {
 
   // Dashboard
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (strlen(appConfig.wifiSSID) < 1 || !isWifiConnected) {
+      request->redirect("/settings");
+      return;
+    }
     String html = getDashboardPageHTML();
     request->send(200, "text/html; charset=utf-8", html);
   });
@@ -77,9 +84,14 @@ void setupWebServer() {
     "/update-file", HTTP_POST, [](AsyncWebServerRequest *request) {
       AsyncWebServerResponse *response;
       if (Update.hasError()) {
+        addLog("Update failed!");
         response = request->beginResponse(500, "text/plain", "Update failed!");
+
       } else {
+        addLog("Update complete.");
         response = request->beginResponse(200, "text/plain", "Update complete. Rebooting...");
+        addLog("Rebooting...");
+        delay(1000);
         ESP.restart();
       }
       request->send(response);
@@ -110,7 +122,7 @@ void setupWebServer() {
       }
       const char *url = doc["url"];
       addLogf("OTA from URL: %s\n", url);
-      // Ở đây bạn cần gọi hàm HTTP client download và Update.writeStream()
+   
     });
 
   server.on("/dashboard.js", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -146,7 +158,10 @@ void setupWebServer() {
     doc["mqADCPin"] = appConfig.mqADCPin;
     doc["mq_rl_kohm"] = appConfig.mq_rl_kohm;
     doc["mq_r0_ratio_clean"] = appConfig.mq_r0_ratio_clean;
+
     doc["mq_rzero"] = appConfig.mq_rzero;
+    doc["dust_baseline"] = appConfig.dust_baseline;
+    doc["autoCalibrateOnBoot"] = appConfig.autoCalibrateOnBoot;
 
 
     String jsonConfig;
@@ -189,6 +204,11 @@ void setupWebServer() {
       if (doc.containsKey("mq_rl_kohm")) appConfig.mq_rl_kohm = doc["mq_rl_kohm"].as<float>();
       if (doc.containsKey("mq_r0_ratio_clean")) appConfig.mq_r0_ratio_clean = doc["mq_r0_ratio_clean"].as<float>();
       if (doc.containsKey("mq_rzero")) appConfig.mq_rzero = doc["mq_rzero"].as<float>();
+      if (doc.containsKey("dust_baseline")) appConfig.dust_baseline = doc["dust_baseline"].as<float>();
+
+      if (doc.containsKey("autoCalibrateOnBoot")) appConfig.autoCalibrateOnBoot = doc["autoCalibrateOnBoot"].as<bool>();
+
+
       if (doc.containsKey("dustLEDPin")) appConfig.dustLEDPin = doc["dustLEDPin"].as<uint8_t>();
       if (doc.containsKey("dustADCPin")) appConfig.dustADCPin = doc["dustADCPin"].as<uint8_t>();
       if (doc.containsKey("mqADCPin")) appConfig.mqADCPin = doc["mqADCPin"].as<uint8_t>();
@@ -204,97 +224,11 @@ void setupWebServer() {
 
 
 
-  server.on("/calibrate-mq135", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String page = R"HTML(
-<html>
-<body style='font-family:Arial;padding:20px;'>
-<h2>Calibrate MQ135</h2>
-<button onclick="startCalibrate()" style='padding:10px;font-size:18px;'>Start Calibration</button>
-<pre id='log' style='background:#000;color:#0f0;padding:10px;margin-top:20px;height:200px;overflow:auto;white-space: pre-wrap;'></pre>
-<script>
-let ws = new WebSocket("ws://" + location.host + "/ws");
-ws.onmessage = (event) => {
-    try {
-        let msg = JSON.parse(event.data);
-         if(msg.type === "log"){
-            let logEl = document.getElementById('log');
-            logEl.innerHTML += msg.msg + "\n";  
-            logEl.scrollTop = logEl.scrollHeight;
-        }
-    } catch(e){}
-};
-
-function startCalibrate(){
-    document.getElementById('log').innerText = "Calibration started...\n";
-    fetch('/api/mq135/calibrate');
-}
-</script>
-</body>
-</html>
-    )HTML";
-
-    request->send(200, "text/html", page);
-  });
-
-
-  server.on("/api/mq135/calibrate", [&](AsyncWebServerRequest *request) {
-    if (calibrating) {
-      request->send(400, "text/plain", "Calibration already running");
-      return;
-    }
-
-    calibrating = true;
-    request->send(200, "text/plain", "Calibration started...");
-
-    // truyền địa chỉ biến vào task
-    xTaskCreate([](void *param) {
-      bool *pCalibrating = (bool *)param;
-
-      float temp = NAN, hum = NAN;
-      if (bmeInitialized) {
-        temp = bme.readTemperature();
-        hum = bme.readHumidity();
-      }
-
-      if (!isfinite(temp) || !isfinite(hum)) {
-        addLog("BME280 not ready");
-        *pCalibrating = false;
-        vTaskDelete(NULL);
-        return;
-      }
-
-      const int rounds = 50;
-      float lastR0 = NAN;
-
-      for (int i = 1; i <= rounds; i++) {
-        float r0 = mq135->autoCalibrate(temp, hum);
-        if (isfinite(r0)) {
-          lastR0 = r0;
-          addLogf("Calibration round %d: RZERO=%.3f", i, r0);
-        } else {
-          addLogf("Calibration round %d failed", i);
-        }
-        vTaskDelay(500 / portTICK_PERIOD_MS);
-      }
-
-      if (isfinite(lastR0)) {
-        appConfig.mq_rzero = lastR0;
-        saveConfig();
-        addLogf("Calibration finished. Final RZERO=%.3f", lastR0);
-      } else {
-        addLog("Calibration failed");
-      }
-
-      *pCalibrating = false;
-      vTaskDelete(NULL);
-    },
-                "MQ135CalTask", 4096, &calibrating, 1, NULL);
-  });
-
 
 
   server.on("/reboot", HTTP_GET, handleReboot);
   server.on("/reset", HTTP_GET, handleReset);
+  setupCalibrationRoutes();
 
   server.begin();
   String msg = "Web server started on http://";

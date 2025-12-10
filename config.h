@@ -8,36 +8,39 @@
 
 // --- App Configuration ---
 typedef struct {
-    // WiFi
-    char wifiSSID[32];
-    char wifiPass[64];
+  // WiFi
+  char wifiSSID[32];
+  char wifiPass[64];
 
-    // MQTT
-    char mqttServer[64];
-    uint16_t mqttPort;
-    char mqttUser[32];
-    char mqttPass[64];
-    char mqttTopic[64];
-    bool mqttEnabled;
+  // MQTT
+  char mqttServer[64];
+  uint16_t mqttPort;
+  char mqttUser[32];
+  char mqttPass[64];
+  char mqttTopic[64];
+  bool mqttEnabled;
 
-    // Timing
-    uint32_t sendInterval;
-    char ntpServer[64];
+  // Timing
+  uint32_t sendInterval;
+  char ntpServer[64];
 
-    // GPIO
-    uint8_t dustLEDPin;
-    uint8_t dustADCPin;
-    uint8_t mqADCPin;
+  // GPIO
+  uint8_t dustLEDPin;
+  uint8_t dustADCPin;
+  uint8_t mqADCPin;
 
-    // MQ135 Calibration
-    float mq_rl_kohm;           
-    float mq_r0_ratio_clean;    
-    float mq_rzero;             
+  // MQ135 Calibration
+  float mq_rl_kohm;
+  float mq_r0_ratio_clean;
+  float mq_rzero;
+  float dust_baseline;
 
-    // Device Info
-    char deviceId[DEVICE_ID_MAX_LEN];
-    float latitude;
-    float longitude;
+  bool autoCalibrateOnBoot;
+
+  // Device Info
+  char deviceId[DEVICE_ID_MAX_LEN];
+  float latitude;
+  float longitude;
 
 } AppConfig_t;
 
@@ -51,7 +54,7 @@ void resetConfig();
 
 // --- Logging ---
 struct LogEntry {
-    String message;
+  String message;
 };
 
 extern LogEntry logBuffer[LOG_BUFFER_SIZE];

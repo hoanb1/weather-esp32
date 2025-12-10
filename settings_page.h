@@ -61,12 +61,18 @@ h3{color:#34495e;margin-top:20px;padding-bottom:5px;border-bottom:1px dashed #cc
 <div class="form-row"><label for="sendInterval">Send Interval (ms):</label><input type="number" id="sendInterval" name="sendInterval"></div>
 
 <h3>Sensor Pinout & Calibration</h3>
+<div class="form-row">
+  <label for="autoCalibrateOnBoot">Auto Calibrate on Boot:</label>
+  <input type="checkbox" id="autoCalibrateOnBoot" name="autoCalibrateOnBoot">
+</div>
+
 <div class="form-row"><label for="dustLEDPin">Dust LED Pin:</label><input type="number" id="dustLEDPin" name="dustLEDPin"></div>
 <div class="form-row"><label for="dustADCPin">Dust ADC Pin:</label><input type="number" id="dustADCPin" name="dustADCPin"></div>
 <div class="form-row"><label for="mqADCPin">MQ ADC Pin:</label><input type="number" id="mqADCPin" name="mqADCPin"></div>
 <div class="form-row"><label for="mq_rl_kohm">MQ RL (kOhm):</label><input type="number" step="0.01" id="mq_rl_kohm" name="mq_rl_kohm"></div>
 <div class="form-row"><label for="mq_r0_ratio_clean">MQ R0 ratio:</label><input type="number" step="0.001" id="mq_r0_ratio_clean" name="mq_r0_ratio_clean"></div>
 <div class="form-row"><label for="mq_rzero">MQ RZERO:</label><input type="number" step="0.01" id="mq_rzero" name="mq_rzero"></div>
+<div class="form-row"><label for="dust_baseline">Dust Baseline:</label><input type="number" step="0.0001" id="dust_baseline" name="dust_baseline"></div>
 
 <div class="btn-group">
 <button type="submit" class="btn-primary">Save & Reboot</button>
@@ -128,73 +134,5 @@ document.getElementById('configForm').onsubmit = function(e){
 </html>
 )rawliteral";
 
-  return html;
-}
-
-String getOTAPageHTML(const String &statusMsg) {
-  String html = R"rawliteral(
-<!DOCTYPE html>
-<html>
-<head>
-<title>OTA Update</title>
-<meta name='viewport' content='width=device-width, initial-scale=1'>
-<style>
-body{font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;background:#e9eef2;padding:20px;color:#333;}
-.container{max-width:500px;margin:0 auto;background:#fff;padding:25px;border-radius:12px;box-shadow:0 6px 16px rgba(0,0,0,0.1);}
-h2{color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:10px;margin-top:0;}
-button{background:#2ecc71;color:white;padding:12px 15px;border:none;border-radius:6px;cursor:pointer;margin-top:10px;font-size:16px;width:100%;transition:background 0.3s;}
-button:hover{background:#27ae60;}
-label{display:block;margin-top:15px;font-weight:600;color:#555;}
-input[type=file], input[type=text]{width:100%;padding:10px;margin-top:5px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;}
-.status{margin-bottom:20px;font-weight:bold;padding:12px;border-radius:6px;background:#ecf0f1;border-left:5px solid #3498db;}
-#logArea{height:150px;overflow:auto;background:#1c1c1c;color:#00ff66;padding:10px;font-family:monospace;margin-top:20px;border-radius:6px;}
-</style>
-</head>
-<body>
-<div class="container">
-<h2>Firmware Update (OTA)</h2>
-<div class="status">Status: )rawliteral"
-                + statusMsg + R"rawliteral(</div>
-
-<form method="POST" action="/update-file" enctype="multipart/form-data">
-  <label for="updateFile">1. Local File Upload</label>
-  <input type="file" name="update" id="updateFile" accept=".bin">
-  <button type="submit">Upload & Update</button>
-</form>
-
-<form id="otaUrlForm">
-  <label for="otaUrl">2. Update from URL (HTTP/HTTPS)</label>
-  <input type="text" id="otaUrl" name="otaUrl" placeholder="e.g., https://your-server.com/firmware.bin">
-  <button type="button" onclick="updateFromUrl()">Start Update from URL</button>
-</form>
-
-<div id="logArea">OTA log will appear here...</div>
-
-<script>
-function updateFromUrl() {
-  const url = document.getElementById('otaUrl').value;
-  const logArea = document.getElementById('logArea');
-  if(!url) { alert('Please enter a valid URL'); return; }
-  
-  logArea.innerText = 'Starting OTA update from: ' + url + '...';
-
-  fetch('/update-url', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({url: url})
-  }).then(r=>r.text()).then(t=>{
-    logArea.innerText += '\n' + t;
-    if (t.includes("Starting")) {
-        logArea.innerText += "\nCheck serial monitor for detailed progress.";
-    }
-  }).catch(e => {
-    logArea.innerText = 'Error during fetch: ' + e;
-  });
-}
-</script>
-</div>
-</body>
-</html>
-)rawliteral";
   return html;
 }
