@@ -122,7 +122,6 @@ void setupWebServer() {
       }
       const char *url = doc["url"];
       addLogf("OTA from URL: %s\n", url);
-   
     });
 
   server.on("/dashboard.js", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -151,6 +150,10 @@ void setupWebServer() {
     doc["mqttTopic"] = appConfig.mqttTopic;
     doc["mqttEnabled"] = appConfig.mqttEnabled;
 
+    doc["queueMaxSize"] = appConfig.queueMaxSize;
+    doc["queueFlushInterval"] = appConfig.queueFlushInterval;
+
+
     doc["sendInterval"] = appConfig.sendInterval;
     doc["ntpServer"] = appConfig.ntpServer;
     doc["dustLEDPin"] = appConfig.dustLEDPin;
@@ -161,6 +164,8 @@ void setupWebServer() {
 
     doc["mq_rzero"] = appConfig.mq_rzero;
     doc["dust_baseline"] = appConfig.dust_baseline;
+    doc["dust_calibration"] = appConfig.dust_calibration;
+
     doc["autoCalibrateOnBoot"] = appConfig.autoCalibrateOnBoot;
 
 
@@ -198,6 +203,9 @@ void setupWebServer() {
       if (doc.containsKey("mqttTopic")) strncpy(appConfig.mqttTopic, doc["mqttTopic"], sizeof(appConfig.mqttTopic));
       if (doc.containsKey("mqttEnabled")) appConfig.mqttEnabled = doc["mqttEnabled"].as<bool>();
 
+      if (doc.containsKey("queueMaxSize")) appConfig.queueMaxSize = doc["queueMaxSize"].as<uint32_t>();
+      if (doc.containsKey("queueFlushInterval")) appConfig.queueFlushInterval = doc["queueFlushInterval"].as<uint16_t>();
+
 
       if (doc.containsKey("sendInterval")) appConfig.sendInterval = doc["sendInterval"].as<uint32_t>();
       if (doc.containsKey("ntpServer")) strncpy(appConfig.ntpServer, doc["ntpServer"], sizeof(appConfig.ntpServer));
@@ -205,6 +213,7 @@ void setupWebServer() {
       if (doc.containsKey("mq_r0_ratio_clean")) appConfig.mq_r0_ratio_clean = doc["mq_r0_ratio_clean"].as<float>();
       if (doc.containsKey("mq_rzero")) appConfig.mq_rzero = doc["mq_rzero"].as<float>();
       if (doc.containsKey("dust_baseline")) appConfig.dust_baseline = doc["dust_baseline"].as<float>();
+      if (doc.containsKey("dust_calibration")) appConfig.dust_calibration = doc["dust_calibration"].as<float>();
 
       if (doc.containsKey("autoCalibrateOnBoot")) appConfig.autoCalibrateOnBoot = doc["autoCalibrateOnBoot"].as<bool>();
 

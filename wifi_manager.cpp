@@ -134,16 +134,3 @@ void setupWiFi() {
   connectToStrongestNode();
 }
 
-void reconnectMQTT() {
-  if (!isWifiConnected) return;
-  if (mqttClient.connected()) return;
-
-  addLog("[MQTT] Connecting...");
-  String clientId = "ESP32Weather-" + String(random(0xffff), HEX);
-
-  if (mqttClient.connect(clientId.c_str(), appConfig.mqttUser, appConfig.mqttPass)) {
-    addLog("[MQTT] Connected");
-  } else {
-    addLogf("[MQTT] Connection failed, rc=%d", mqttClient.state());
-  }
-}

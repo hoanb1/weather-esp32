@@ -25,6 +25,9 @@ const AppConfig_t defaultConfig = {
   .mqttTopic = "weather/data",
   .mqttEnabled = true,
 
+  .queueMaxSize = 200 * 1024,  // 200 KB default
+  .queueFlushInterval = 5000,  // try sending every 5s
+
   .sendInterval = 5000,
   .ntpServer = "pool.ntp.org",
 
@@ -32,10 +35,11 @@ const AppConfig_t defaultConfig = {
   .dustADCPin = 35,
   .mqADCPin = 34,
 
-  .mq_rl_kohm = 10.0,
+  .mq_rl_kohm = 1.0,
   .mq_r0_ratio_clean = 3.6,
   .mq_rzero = 0,
   .dust_baseline = 0,
+  .dust_calibration = 1,
 
   .autoCalibrateOnBoot = true,
 

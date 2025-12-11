@@ -81,9 +81,17 @@ void initDustSensor() {
 
   if (isfinite(appConfig.dust_baseline) && appConfig.dust_baseline > 0.0f) {
     dustSensor->setBaseline(appConfig.dust_baseline);
+
     addLogf("[DustSensor] Using saved baseline=%.4f", appConfig.dust_baseline);
   } else {
     addLog("[DustSensor] No saved baseline, will calibrate if needed");
+  }
+
+  if (isfinite(appConfig.dust_calibration) && appConfig.dust_calibration > 0.0f) {
+    dustSensor->setCalibrationFactor(appConfig.dust_calibration);
+    addLogf("[DustSensor] Using saved CalibrationFactor=%4f", appConfig.dust_calibration);
+  } else {
+    addLog("[DustSensor] No saved CalibrationFactor, will CalibrationFactor if needed");
   }
 }
 
@@ -126,8 +134,7 @@ String getDataJson() {
   String json;
   serializeJson(doc, json);
 
-  addLogf("[DEBUG] T=%.1f H=%.1f P=%.1f PM=%u AQI=%d MQ=%.0f",
-          t, h, p, pm, aqi, mqIndex);
+  addLogf("[DEBUG] T=%.1f H=%.1f P=%.1f PM=%u AQI=%d MQ=%.0f", t, h, p, pm, aqi, mqIndex);
 
   return json;
 }

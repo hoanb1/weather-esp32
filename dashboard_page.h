@@ -59,7 +59,7 @@ body {
     color: white;
     text-decoration: none;
     font-weight: 500;
-    padding: 8px 12px;
+    padding: 8px 6px;
     border-radius: 6px;
     transition: background 0.3s, transform 0.1s;
     display: flex;

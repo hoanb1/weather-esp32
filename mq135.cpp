@@ -112,7 +112,7 @@ float MQ135::getStoredRZero() {
 // Auto calibration (clean air baseline)
 // ======================================================================
 float MQ135::autoCalibrate(float t, float h) {
-    const int N = 200;
+    const int N = 30;
     float sum = 0;
     int count = 0;
 

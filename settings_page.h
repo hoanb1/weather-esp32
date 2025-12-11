@@ -60,6 +60,11 @@ h3{color:#34495e;margin-top:20px;padding-bottom:5px;border-bottom:1px dashed #cc
 <div class="form-row"><label for="mqttTopic">MQTT Topic:</label><input type="text" id="mqttTopic" name="mqttTopic"></div>
 <div class="form-row"><label for="sendInterval">Send Interval (ms):</label><input type="number" id="sendInterval" name="sendInterval"></div>
 
+<h3>Queue Settings</h3>
+<div class="form-row"><label for="queueMaxSize">Queue Max Size (bytes):</label><input type="number" id="queueMaxSize" name="queueMaxSize"></div>
+<div class="form-row"><label for="queueFlushInterval">Queue Flush Interval (ms):</label><input type="number" id="queueFlushInterval" name="queueFlushInterval"></div>
+
+
 <h3>Sensor Pinout & Calibration</h3>
 <div class="form-row">
   <label for="autoCalibrateOnBoot">Auto Calibrate on Boot:</label>
@@ -73,6 +78,7 @@ h3{color:#34495e;margin-top:20px;padding-bottom:5px;border-bottom:1px dashed #cc
 <div class="form-row"><label for="mq_r0_ratio_clean">MQ R0 ratio:</label><input type="number" step="0.001" id="mq_r0_ratio_clean" name="mq_r0_ratio_clean"></div>
 <div class="form-row"><label for="mq_rzero">MQ RZERO:</label><input type="number" step="0.01" id="mq_rzero" name="mq_rzero"></div>
 <div class="form-row"><label for="dust_baseline">Dust Baseline:</label><input type="number" step="0.0001" id="dust_baseline" name="dust_baseline"></div>
+<div class="form-row"><label for="dust_calibration">Dust calibration factor:</label><input type="number" step="0.0001" id="dust_calibration" name="dust_calibration"></div>
 
 <div class="btn-group">
 <button type="submit" class="btn-primary">Save & Reboot</button>

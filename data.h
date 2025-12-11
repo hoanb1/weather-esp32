@@ -27,6 +27,7 @@ extern unsigned long lastSend;
 extern bool isWifiConnected;
 extern bool bmeInitialized;
 
+
 // --- Data & Sensor Handling ---
 String getDataJson();
 int calcAQI_PM25(float pm25);
@@ -49,8 +50,6 @@ void handleReset(AsyncWebServerRequest* request);
 void setupWiFi();
 void maintainWiFi();
 
-// --- MQTT ---
-void reconnectMQTT();
 
 // --- MQ135 ---
 void initMQ135();

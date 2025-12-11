@@ -1,4 +1,4 @@
-//weather-esp32.ino
+// File: weather-esp32.ino
 #include <Arduino.h>
 #include <WiFiClient.h>
 #include <PubSubClient.h>
@@ -10,6 +10,7 @@
 #include "ota_update.h"
 #include "mq135.h"
 #include "calibrate.h"
+#include "mqtt_handler.h"  // loopMQTT(), sendMQTT()
 
 // --- Global Objects ---
 const unsigned long SYSTEM_INFO_INTERVAL = 10000;
@@ -51,7 +52,6 @@ void setup() {
   setupWebServer();
   setupOTA();
 
-
   // BME280
   if (!bme.begin(0x76)) {
     addLog("[ERROR] BME280 not found");
@@ -61,56 +61,44 @@ void setup() {
     addLog("[INFO] BME280 initialized");
   }
 
-    // Dust sensor
+  // Sensors
   initDustSensor();
-  // MQ135 sensor
   initMQ135();
 
-  // Auto calibrate 
-  if (appConfig.autoCalibrateOnBoot) {
-    startCalibration();
-  }
-
+  // Auto calibrate
+  if (appConfig.autoCalibrateOnBoot) startCalibration();
 
   // Time sync
   setupTime();
 
   // MQTT
-  if (!appConfig.mqttEnabled) {
-    addLog("[MQTT] Disabled, skipping publish");
-  } else {
-    mqttClient.setServer(appConfig.mqttServer, appConfig.mqttPort);
-  }
+  if (appConfig.mqttEnabled) setupMQTT();  // only set server if enabled
   addLog("=== Setup Complete ===");
 }
 
 void loop() {
-  // WiFi & MQTT
   maintainWiFi();
 
-  if (appConfig.mqttEnabled) {
-    reconnectMQTT();
-    mqttClient.loop();
-  }
-
+  // MQTT safe loop
+  loopMQTT();
 
   // OTA
   ArduinoOTA.handle();
   ws.cleanupClients();
 
-  // Send data
+  // Send sensor data
   if (millis() - lastSend >= appConfig.sendInterval) {
     latestJson = getDataJson();
     notifyClients(latestJson);
 
-    if (appConfig.mqttEnabled && mqttClient.connected()) {
-      if (!mqttClient.publish(appConfig.mqttTopic, latestJson.c_str())) {
-        addLogf("[MQTT] Publish FAILED. State=%d", mqttClient.state());
-      }
-    }
+    if (appConfig.mqttEnabled) sendMQTT(latestJson);
 
     lastSend = millis();
 
+    // Baseline correction
+    if (appConfig.autoCalibrateOnBoot) updateBaselineDriftCorrection();
+
+    // Periodic system info
     static unsigned long lastSystemInfoSend = 0;
     if (millis() - lastSystemInfoSend >= SYSTEM_INFO_INTERVAL) {
       sendSystemInfoToClients();
@@ -119,20 +107,15 @@ void loop() {
   }
 }
 
-
 void sendSystemInfoToClients() {
   StaticJsonDocument<256> doc;
 
   bool connected = WiFi.isConnected();
   const char* statusMsg = connected ? "WiFi Connected" : "Connecting...";
-  const char* statusKey = "status_msg";
-  const char* uptimeKey = "uptime_seconds";
-  const char* rssiKey = "wifi_rssi";
 
-
-  doc[uptimeKey] = millis() / 1000;
-  doc[statusKey] = statusMsg;
-  doc[rssiKey] = connected ? WiFi.RSSI() : 0;
+  doc["status_msg"] = statusMsg;
+  doc["uptime_seconds"] = millis() / 1000;
+  doc["wifi_rssi"] = connected ? WiFi.RSSI() : 0;
 
   String jsonString;
   serializeJson(doc, jsonString);

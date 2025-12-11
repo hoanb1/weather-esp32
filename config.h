@@ -20,6 +20,9 @@ typedef struct {
   char mqttTopic[64];
   bool mqttEnabled;
 
+  uint32_t queueMaxSize;        // max file size in bytes
+  uint16_t queueFlushInterval;  // attempt to send every X ms
+
   // Timing
   uint32_t sendInterval;
   char ntpServer[64];
@@ -34,6 +37,8 @@ typedef struct {
   float mq_r0_ratio_clean;
   float mq_rzero;
   float dust_baseline;
+  float dust_calibration = 1.0f;
+
 
   bool autoCalibrateOnBoot;
 
