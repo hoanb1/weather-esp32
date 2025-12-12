@@ -6,12 +6,13 @@ String getDashboardPageHTML() {
 <!DOCTYPE html>
 <html>
 <head>
-<title>Modern ESP32 Dashboard</title>
+<title>Flat Modern ESP32 Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://code.highcharts.com/highcharts.js"></script>
 <script src="https://code.highcharts.com/highcharts-more.js"></script>
-<script src="https://code.highcharts.com/modules/solid-gauge.js"></script> <script src="https://code.highcharts.com/modules/exporting.js"></script>
+<script src="https://code.highcharts.com/modules/solid-gauge.js"></script>
+<script src="https://code.highcharts.com/modules/exporting.js"></script>
 <script src="https://code.highcharts.com/modules/export-data.js"></script>
 <script src="https://code.highcharts.com/modules/accessibility.js"></script>
 
@@ -21,13 +22,14 @@ String getDashboardPageHTML() {
     --color-primary: #007bff;      /* Blue */
     --color-secondary: #34495e;    /* Dark Slate/Navy */
     --color-background: #f0f2f5;   /* Light Grey Background */
-    --color-surface: white;        /* Tile Background */
+    --color-surface: #ffffff;      /* White/Transparent Look */
     --color-text-dark: #2c3e50;    /* Text */
     --color-text-muted: #95a5a6;
     --color-success: #2ecc71;      /* Green */
     --color-warning: #f39c12;      /* Yellow/Orange */
     --color-danger: #e74c3c;       /* Red */
-    --gauge-size: 140px; 
+    --color-line-separator: #e0e3e6; /* Very light grey for separation */
+    --gauge-size: 140px;
 }
 body {
     font-family: 'Poppins', sans-serif;
@@ -36,15 +38,16 @@ body {
     padding: 0;
     color: var(--color-text-dark);
 }
-/* --- Navbar (No change) --- */
+
+/* --- Navbar (Minimal change - keep structure) --- */
 .navbar {
-    background: var(--color-secondary);
-    color: white;
+    background: var(--color-surface); /* Changed to white surface */
+    color: var(--color-text-dark);   /* Text dark */
     padding: 15px 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05); /* Thin separator line */
 }
 .navbar-title {
     font-size: 1.2em;
@@ -53,10 +56,10 @@ body {
 }
 .nav-links {
     display: flex;
-    gap: 10px;
+    font-size:0.8em;
 }
 .nav-links a {
-    color: white;
+    color: var(--color-text-dark); /* Changed to dark text */
     text-decoration: none;
     font-weight: 500;
     padding: 8px 6px;
@@ -67,8 +70,8 @@ body {
     gap: 8px;
 }
 .nav-links a:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: translateY(-1px);
+    background: var(--color-background); /* Hover effect is background color */
+    transform: none; /* Removed transform for flatter feel */
 }
 
 .main-content {
@@ -77,16 +80,18 @@ body {
     margin: 0 auto;
 }
 
-/* --- Control Bar and System Info (No change) --- */
+/* --- Control Bar (Flat Redesign) --- */
 .control-bar {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 25px;
-    padding: 15px;
-    background: var(--color-surface);
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    padding: 15px 0; /* Removed horizontal padding/background for flat look */
+    background: transparent; /* No background */
+    border-radius: 0;
+    box-shadow: none; /* No shadow */
+    border-bottom: 1px solid var(--color-line-separator); /* Thin separator line */
+    border-top: 1px solid var(--color-line-separator);
 }
 .sys-info {
     font-size: 0.9em;
@@ -104,35 +109,45 @@ body {
     color: white; 
 }
 
-/* --- Tile Grid (No change) --- */
+/* --- Tile Grid (No Panel/Card Redesign) --- */
 .data-grid {
     display: grid;
-    /* Force 3 equal columns on wide screens */
     grid-template-columns: repeat(3, 1fr); 
-    gap: 20px;
+    gap: 10px; /* Reduced gap for tighter, flatter layout */
 }
 .data-tile {
-    background: var(--color-surface);
-    padding: 20px;
-    border-radius: 8px;
-    border: 1px solid #ecf0f1; 
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+    background: #ffffff;
+    padding: 20px 0; /* Adjusted padding */
+    border-radius: 0;
+    border: none; /* NO BORDER */
+    box-shadow: none; /* NO SHADOW */
     transition: all 0.3s;
     display: flex; 
     flex-direction: column;
+    /* Add subtle separator line below each tile/column for flat separation */
+    border-bottom: 1px solid var(--color-line-separator);
 }
+/* Ensure the last row doesn't have the bottom separator or if easier, handle it via parent container */
+/* A grid-based approach often means styling individual items */
+/* Example: Targetting elements that are not in the last row (requires knowing the grid setup)
+.data-grid:last-child .data-tile { border-bottom: none; }
+For simplicity, we leave the separator on all tiles or use a different separator approach.
+Here, we keep it simple: separated by background and line.
+*/
+
 .data-tile:hover {
-    box-shadow: 0 6px 15px rgba(0, 123, 255, 0.15); 
-    border-color: var(--color-primary);
+    box-shadow: none; /* NO HOVER SHADOW */
+    border-color: none;
+    background: #ffffff;
 }
 .tile-header {
-    font-size: 1.2em;
+    font-size: 1.1em;
     margin-bottom: 15px;
     font-weight: 600;
     color: var(--color-text-dark);
     text-align: center;
     padding-bottom: 5px;
-    border-bottom: 2px solid #ecf0f1;
+    border-bottom: 1px solid var(--color-line-separator); /* Use thinner, flat line */
 }
 
 /* --- Media Query for smaller screens (Below 900px) --- */
@@ -142,37 +157,39 @@ body {
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     }
 }
-/* --- Highcharts Gauge Container CSS --- */
+/* --- Highcharts Gauge Container CSS (Keep size) --- */
 .gauge-container {
-    height: 150px; /* Increased height to fit Highcharts gauge better */
+    height: 150px;
     width: 100%;
     margin: 0 auto; 
 }
 
-/* --- Highcharts Line Chart Containers (No change) --- */
+/* --- Highcharts Line Chart Containers (Keep structure) --- */
 .chart-container {
     min-height: 180px;
     flex-grow: 1;
     margin-top: 5px; 
 }
 
-/* --- Log Panel (No change) --- */
+/* --- Log Panel (Flat Redesign) --- */
 .log-panel {
     grid-column: 1 / -1; 
-    margin-top: 20px;
-    background: var(--color-surface);
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    margin-top: 25px;
+    background: transparent; /* NO CARD BACKGROUND */
+    border-radius: 0;
+    padding: 0; /* No Padding */
+    box-shadow: none; /* NO SHADOW */
 }
 .log-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-line-separator); /* Separator line */
 }
 .log-toggle {
-    background: var(--color-secondary);
+    background: var(--color-primary); /* Use primary color */
     color: white;
     border: none;
     padding: 8px 15px;
@@ -182,7 +199,7 @@ body {
     transition: background 0.3s;
 }
 .log-toggle:hover {
-    background: #5a6a7c;
+    background: #0056b3; /* Darker primary on hover */
 }
 
 #logAreaWrapper {
@@ -195,7 +212,7 @@ body {
     max-height: 500px; 
     opacity: 1;
     margin-top: 15px;
-    border-top: 1px solid #ecf0f1;
+    border-top: 1px solid var(--color-line-separator); /* Separator line */
     padding-top: 10px;
 }
 #logArea {
@@ -287,7 +304,7 @@ body {
 
 <div class="log-panel">
     <div class="log-header">
-        <h4 class="tile-header" style="margin-bottom:0; border-bottom: none;">Device Logs</h4>
+        <h4 class="tile-header" style="margin-bottom:0; border-bottom: none; padding-bottom: 0;">Device Logs</h4>
         <button id="logToggleBtn" class="log-toggle">Show Logs</button>
     </div>
     <div id="logAreaWrapper">

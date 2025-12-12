@@ -3,4 +3,5 @@
 *.map
 *.merged.bin
 *.partitions.bin
+replace.txt
 /build/
