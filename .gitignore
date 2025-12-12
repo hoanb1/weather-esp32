@@ -3,5 +3,6 @@
 *.map
 *.merged.bin
 *.partitions.bin
+.idea
 replace.txt
 /build/
