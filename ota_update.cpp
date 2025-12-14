@@ -6,7 +6,9 @@
 #include "config.h"
 
 void setupOTA() {
-  ArduinoOTA.setHostname(appConfig.deviceId);
+  char hostName[12];
+  snprintf(hostName, sizeof(hostName), "%lu", appConfig.deviceId);
+  ArduinoOTA.setHostname(hostName);
 
   ArduinoOTA.onStart([]() {
     String type;

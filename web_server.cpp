@@ -141,6 +141,9 @@ void setupWebServer() {
     doc["deviceId"] = appConfig.deviceId;
     doc["latitude"] = appConfig.latitude;
     doc["longitude"] = appConfig.longitude;
+    doc["stationName"] = appConfig.stationName;
+    doc["stationDescription"] = appConfig.stationDescription;
+
     doc["wifiSSID"] = appConfig.wifiSSID;
     doc["wifiPass"] = appConfig.wifiPass;
     doc["mqttServer"] = appConfig.mqttServer;
@@ -191,9 +194,13 @@ void setupWebServer() {
         return;
       }
 
-      if (doc.containsKey("deviceId")) strncpy(appConfig.deviceId, doc["deviceId"], sizeof(appConfig.deviceId));
+	  if (doc.containsKey("deviceId")) appConfig.deviceId = doc["deviceId"].as<uint32_t>();
       if (doc.containsKey("latitude")) appConfig.latitude = doc["latitude"].as<float>();
       if (doc.containsKey("longitude")) appConfig.longitude = doc["longitude"].as<float>();
+
+      if (doc.containsKey("stationName")) strncpy(appConfig.stationName, doc["stationName"], sizeof(appConfig.stationName));
+      if (doc.containsKey("stationDescription")) strncpy(appConfig.stationDescription, doc["stationDescription"], sizeof(appConfig.stationDescription));
+
       if (doc.containsKey("wifiSSID")) strncpy(appConfig.wifiSSID, doc["wifiSSID"], sizeof(appConfig.wifiSSID));
       if (doc.containsKey("wifiPass")) strncpy(appConfig.wifiPass, doc["wifiPass"], sizeof(appConfig.wifiPass));
       if (doc.containsKey("mqttServer")) strncpy(appConfig.mqttServer, doc["mqttServer"], sizeof(appConfig.mqttServer));
