@@ -7,12 +7,13 @@
 #include <PubSubClient.h>
 #include <Adafruit_BME280.h>
 #include <GP2YDustSensor.h>
+#include "RawPMS7003.h"
 #include "mq135.h"
 #include "config.h"
 
 // --- Global Sensor Instances ---
 extern Adafruit_BME280 bme;
-extern GP2YDustSensor* dustSensor;
+extern GP2YDustSensor* gp2ySensor;
 extern MQ135* mq135;
 
 // --- External Objects ---
@@ -26,6 +27,10 @@ extern String latestJson;
 extern unsigned long lastSend;
 extern bool isWifiConnected;
 extern bool bmeInitialized;
+
+// --- PMS7003 ---
+extern RawPMS7003* pms7003;
+extern bool pmsInitialized;
 
 
 // --- Data & Sensor Handling ---
@@ -55,6 +60,7 @@ void maintainWiFi();
 void initMQ135();
 float calibrateMQ135();
 
-
+// --- PMS7003 ---
+void initPMS7003();
 //MQTT
 String getStaticInfoJson();

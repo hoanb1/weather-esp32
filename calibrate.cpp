@@ -21,7 +21,7 @@ bool calibratingDust = false;
 
 extern bool bmeInitialized;
 extern Adafruit_BME280 bme;
-extern GP2YDustSensor *dustSensor;
+extern GP2YDustSensor *gp2ySensor;
 extern MQ135 *mq135;
 
 unsigned long lastBaselineCalc = 0;
@@ -38,8 +38,8 @@ void applyConfigToSensors() {
         mq135->setRZero(appConfig.mq_rzero);
         addLogf("Applied MQ135 R0 = %.3f", appConfig.mq_rzero);
     }
-    if (dustSensor && isfinite(appConfig.dust_baseline)) {
-        dustSensor->setBaseline(appConfig.dust_baseline);
+    if (gp2ySensor && isfinite(appConfig.dust_baseline)) {
+        gp2ySensor->setBaseline(appConfig.dust_baseline);
         addLogf("Applied Dust Baseline = %.3f", appConfig.dust_baseline);
     }
 }
@@ -48,13 +48,13 @@ void applyConfigToSensors() {
 void updateBaselineDriftCorrection() {
     if (millis() - lastBaselineCalc < BASELINE_CALC_INTERVAL) return;
 
-    float newCandidate = dustSensor->getBaselineCandidate();
+    float newCandidate = gp2ySensor->getBaselineCandidate();
     float oldBaseline = appConfig.dust_baseline;
     float saveValue = oldBaseline;
 
-    if (newCandidate > 0.0 && newCandidate < dustSensor->getBaseline()) {
+    if (newCandidate > 0.0 && newCandidate < gp2ySensor->getBaseline()) {
         saveValue = newCandidate;
-        dustSensor->setBaseline(saveValue);
+        gp2ySensor->setBaseline(saveValue);
 
         if (saveValue != oldBaseline) {
             appConfig.dust_baseline = saveValue;

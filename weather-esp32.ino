@@ -29,6 +29,9 @@ void logAppConfig() {
   addLogf("Send Interval: %lu ms", appConfig.sendInterval);
 
   addLogf("Dust LED Pin: %d, Dust ADC Pin: %d", appConfig.dustLEDPin, appConfig.dustADCPin);
+
+  addLogf("PMS RX Pin: %d, PMS TX Pin: %d", appConfig.pmsRxPin, appConfig.pmsTxPin);
+
   addLogf("MQ135 ADC Pin: %d", appConfig.mqADCPin);
 
 addLogf("Device ID: %u", appConfig.deviceId);
@@ -41,6 +44,7 @@ void setup() {
   Serial.begin(115200);
   addLog("=== Starting ESP32 Weather Station ===");
 
+  //resetConfig();
   loadConfig();
   logAppConfig();
 
@@ -62,6 +66,7 @@ void setup() {
 
   // Sensors
   initDustSensor();
+  initPMS7003();
   initMQ135();
 
   // Auto calibrate
@@ -92,6 +97,7 @@ void loop() {
     notifyClients(latestJson);
 
     if (appConfig.mqttEnabled) sendMQTT(latestJson);
+    addLogf("[INFO] Sent data to MQTT: %s", latestJson.c_str());
 
     lastSend = millis();
 

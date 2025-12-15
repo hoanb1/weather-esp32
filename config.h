@@ -13,6 +13,8 @@ typedef struct {
   char wifiSSID[32];
   char wifiPass[64];
 
+
+
   // MQTT
   char mqttServer[64];
   uint16_t mqttPort;
@@ -33,6 +35,9 @@ typedef struct {
   uint8_t dustLEDPin;
   uint8_t dustADCPin;
   uint8_t mqADCPin;
+
+  uint8_t pmsRxPin; // Pin 27
+  uint8_t pmsTxPin; // Pin 26
 
   // MQ135 Calibration
   float mq_rl_kohm;
