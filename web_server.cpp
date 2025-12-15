@@ -150,7 +150,7 @@ void setupWebServer() {
     doc["mqttPort"] = appConfig.mqttPort;
     doc["mqttUser"] = appConfig.mqttUser;
     doc["mqttPass"] = appConfig.mqttPass;
-    doc["mqttTopic"] = appConfig.mqttTopic;
+
     doc["mqttEnabled"] = appConfig.mqttEnabled;
 
     doc["queueMaxSize"] = appConfig.queueMaxSize;
@@ -207,7 +207,7 @@ void setupWebServer() {
       if (doc.containsKey("mqttPort")) appConfig.mqttPort = doc["mqttPort"].as<uint16_t>();
       if (doc.containsKey("mqttUser")) strncpy(appConfig.mqttUser, doc["mqttUser"], sizeof(appConfig.mqttUser));
       if (doc.containsKey("mqttPass")) strncpy(appConfig.mqttPass, doc["mqttPass"], sizeof(appConfig.mqttPass));
-      if (doc.containsKey("mqttTopic")) strncpy(appConfig.mqttTopic, doc["mqttTopic"], sizeof(appConfig.mqttTopic));
+
       if (doc.containsKey("mqttEnabled")) appConfig.mqttEnabled = doc["mqttEnabled"].as<bool>();
 
       if (doc.containsKey("queueMaxSize")) appConfig.queueMaxSize = doc["queueMaxSize"].as<uint32_t>();

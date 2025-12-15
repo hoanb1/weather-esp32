@@ -3,9 +3,17 @@
 #include <SPIFFS.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include <ArduinoJson.h> // Assuming you use ArduinoJson
+#include <ArduinoJson.h>
 #include "config.h"
 #include "data.h"
+
+// =====================================================================
+// === GLOBAL TOPIC DEFINITIONS (NEW) ===
+// Topics now use the Token for identification to match ACL Rule 3.
+// =====================================================================
+char MQTT_DATA_TOPIC[64];    // sensor/{token}/data
+char MQTT_CONFIG_TOPIC[64];  // sensor/{token}/config
+// =====================================================================
 
 // --- MQTT client ---
 PubSubClient mqttClient(wifiClient);
@@ -62,7 +70,7 @@ void appendToQueue(const String &json) {
 
     // If mounted (isSpiffsMounted == true)
     if (isSpiffsMounted) {
-        // ... (File writing logic, kept brief for focus)
+        // ... (File writing logic)
         File f = SPIFFS.open("/mqtt_queue.txt", "a");
         if(f) {
             for(uint8_t i = 0; i < ramQueueCount; i++) f.println(ramQueue[i]);
@@ -84,12 +92,12 @@ void sendMQTT(const String &json) {
         return;
     }
 
-    // Note: This function is for data topic (appConfig.mqttTopic)
-    if (!mqttClient.publish(appConfig.mqttTopic, json.c_str())) {
-        addLog("[MQTT] Publish failed, added to queue");
+    // NEW: Always publish to MQTT_DATA_TOPIC
+    if (!mqttClient.publish(MQTT_DATA_TOPIC, json.c_str())) {
+        addLogf("[MQTT] Publish failed, added to queue topic=%s", MQTT_DATA_TOPIC);
         appendToQueue(json);
     } else {
-       // addLog("[MQTT] Message sent successfully");
+        addLogf("[MQTT] Message sent successfully topic=%s", MQTT_DATA_TOPIC);
     }
 }
 
@@ -98,7 +106,7 @@ void sendQueue() {
 
     // RAM queue first
     for(uint8_t i = 0; i < ramQueueCount; i++) {
-        // Note: sendMQTT will re-queue if publish fails
+        // Note: sendMQTT will re-queue if publish fails (sends to DATA topic)
         sendMQTT(ramQueue[i]);
     }
     ramQueueCount = 0;
@@ -119,7 +127,8 @@ void sendQueue() {
         line.trim();
         if(line.length() == 0) continue;
 
-        if (!mqttClient.publish(appConfig.mqttTopic, line.c_str())) {
+        // NEW: Publish queue data to MQTT_DATA_TOPIC
+        if (!mqttClient.publish(MQTT_DATA_TOPIC, line.c_str())) {
             temp.println(line); // keep unsent lines
         }
     }
@@ -140,6 +149,7 @@ void reconnectMQTT() {
 
     addLog("[MQTT] Connecting...");
 
+    // Device ID is used as Client ID (This is OK, Mosquitto uses Username/Token for ACL)
     char clientId[12];
     sprintf(clientId, "%u", appConfig.deviceId);
 
@@ -172,20 +182,35 @@ void reconnectMQTT() {
         // END: ADDED DEBUG LOGGING
         // =================================================================
 
+        // NEW: Publish config to MQTT_CONFIG_TOPIC
+
         if (mqttClient.publish(MQTT_CONFIG_TOPIC, staticInfo.c_str())) {
-            addLog("[MQTT] Static configuration info sent.");
+            addLogf("[MQTT] Static configuration info sent. topic=%s", MQTT_CONFIG_TOPIC);
         } else {
-            addLog("[MQTT] Failed to send static configuration info.");
+            addLogf("[MQTT] Failed to send static configuration info. topic=%s", MQTT_CONFIG_TOPIC);
         }
     } else {
         addLogf("[MQTT] Connection failed, rc=%d", mqttClient.state());
     }
 }
 
-// --- Setup MQTT and Loop MQTT (Kept the same) ---
+// --- Setup MQTT and Loop MQTT ---
 void setupMQTT() {
     if (appConfig.mqttEnabled) {
         mqttClient.setServer(appConfig.mqttServer, appConfig.mqttPort);
+
+        // =================================================================
+        // FIX: Generate topics based on Token (mqttPass) to match ACL Rule 3
+        // =================================================================
+        const char* unifiedToken = appConfig.mqttPass;
+        sprintf(MQTT_DATA_TOPIC, "sensor/%s/data", unifiedToken);
+        sprintf(MQTT_CONFIG_TOPIC, "sensor/%s/config", unifiedToken);
+        // =================================================================
+
+        // OLD appConfig.mqttTopic is now unused for publishing, but we keep it for reference or other uses
+        // appConfig.mqttTopic = MQTT_DATA_TOPIC;
+        addLogf("[MQTT] Data Topic set to: %s", MQTT_DATA_TOPIC);
+        addLogf("[MQTT] Config Topic set to: %s", MQTT_CONFIG_TOPIC);
     }
 }
 

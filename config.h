@@ -5,7 +5,6 @@
 
 #define LOG_BUFFER_SIZE 10
 #define PREFERENCES_NAMESPACE "weather_cfg"
-#define MQTT_CONFIG_TOPIC "weather/config"
 
 
 // --- App Configuration ---

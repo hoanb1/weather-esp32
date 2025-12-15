@@ -11,12 +11,12 @@ String getSettingsPageHTML(const String &statusMsg, const String &jsonConfig) {
 <title>System Settings</title>
 <meta name='viewport' content='width=device-width, initial-scale=1'>
 <style>
-body{font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;background:#e9eef2;padding:20px;color:#333;}
+body{font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;background:#e9eef2;padding:20px;color:#333;font-size: 0.8rem;}
 .container{max-width:600px;margin:0 auto;background:#fff;padding:25px;border-radius:12px;box-shadow:0 6px 16px rgba(0,0,0,0.1);}
 h2{color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:10px;margin-top:0;}
 h3{color:#34495e;margin-top:20px;padding-bottom:5px;border-bottom:1px dashed #ccc;}
 .form-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
-.form-row label{width:45%;font-weight:600;color:#555;}
+.form-row label{width:45%;color:#555;}
 .form-row input[type=text],.form-row input[type=password],.form-row input[type=number]{width:50%;padding:10px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;}
 .btn-primary{background:#3498db;color:white;padding:12px 20px;border:none;border-radius:6px;cursor:pointer;font-size:16px;transition:background 0.3s;}
 .btn-primary:hover{background:#2980b9;}
@@ -61,7 +61,6 @@ h3{color:#34495e;margin-top:20px;padding-bottom:5px;border-bottom:1px dashed #cc
 <div class="form-row"><label for="mqttPort">MQTT Port:</label><input type="number" id="mqttPort" name="mqttPort"></div>
 
 <div class="form-row"><label for="mqttPass">Unified Token/API Key:</label><input type="text" id="mqttPass" name="mqttPass"></div>
-<div class="form-row"><label for="mqttTopic">MQTT Topic:</label><input type="text" id="mqttTopic" name="mqttTopic"></div>
 <div class="form-row"><label for="sendInterval">Send Interval (ms):</label><input type="number" id="sendInterval" name="sendInterval"></div>
 
 <h3>Queue Settings</h3>

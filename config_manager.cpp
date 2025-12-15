@@ -17,14 +17,13 @@ uint8_t logIndex = 0;
 
 // --- Default Config ---
 const AppConfig_t defaultConfig = {
-  .wifiSSID = "HH",
-  .wifiPass = "12345678",
+  .wifiSSID = "",
+  .wifiPass = "",
 
   .mqttServer = "pi.hoan.uk",
   .mqttPort = 1883,
   .mqttUser = "sensor",
   .mqttPass = "4f9605ca60ceeff2",
-  .mqttTopic = "weather/data",
   .mqttEnabled = true,
 
   .queueMaxSize = 200 * 1024,  // 200 KB default

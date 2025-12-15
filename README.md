@@ -1,91 +1,102 @@
-# ☁️ ESP32 Weather and Air Quality Station (weather-esp32)
+# 🌍 ESP32 Air Quality & Weather Station
 
-This project implements a comprehensive **Weather and Air Quality Station** using the **ESP32** microcontroller. It is designed to read environmental data from multiple sensors, synchronize time via Network Time Protocol (NTP), and publish the results to an **MQTT Broker** while providing a **Web-based Dashboard and Configuration Portal**.
+This is the firmware for an ESP32-based device designed to monitor local weather conditions and air quality. It utilizes sensors for temperature, humidity, pressure, particulate matter (PM2.5/Dust), and general air quality (MQ-135), providing data locally via a web interface and remotely via MQTT.
 
----
+## ✨ Key Features
 
-## ✨ Features
+* **Multi-Sensor Integration:** Reads data from:
+    * **BME280:** Temperature, Humidity, and Barometric Pressure.
+    * **GP2Y Dust Sensor:** Measures Particulate Matter (PM2.5/Dust Density).
+    * **MQ-135:** General Air Quality Index (CO, Alcohol, Benzene, Smoke, etc.).
+* **Data Transmission:**
+    * **MQTT:** Publishes sensor data to a configurable MQTT broker at set intervals.
+    * **WebSocket:** Real-time data updates to connected web clients for local monitoring.
+* **Configuration & Monitoring:**
+    * **Async Web Server:** Provides a local interface for status viewing and configuration.
+    * **Configuration Persistence:** Stores settings (WiFi credentials, MQTT server, calibration data) in ESP32's Non-Volatile Storage (NVS).
+* **Networking:**
+    * **Robust WiFi Management:** Implements scanning and connection logic to connect to the strongest access point (based on BSSID/RSSI).
+    * **Fallback Access Point (AP) Mode:** Starts a local AP if the configured WiFi connection fails.
+    * **Over-The-Air (OTA) Updates:** Allows firmware updates without physical connection.
+* **Calibration:**
+    * Includes logic for initial and ongoing calibration of the MQ-135 and Dust sensor for better accuracy.
 
-* **Multi-Sensor Data Collection:** Reads **Temperature, Humidity, Pressure** (BME280), **Dust/PM concentration** (GP2Y10), and **Gas/Air Quality** (MQ-135 or similar).
-* **Temperature/Humidity Compensation:** Advanced gas processing uses the MQ-135 sensor to calculate a **Corrected Air Quality concentration ($\text{PPM}$)**, factoring in ambient temperature and humidity from the BME280 for better accuracy.
-* **AQI Calculation:** Calculates the **Air Quality Index (AQI)** based on the $\mathbf{PM}_{2.5}$ concentration from the GP2Y10 dust sensor (using EPA's breakpoints).
-* **Persistent & Flexible Configuration:** Stores all settings (WiFi, MQTT, GPIO pins, and sensor calibration) in the ESP32's **NVS (Non-Volatile Storage)**, configurable via the web interface.
-* **Smart WiFi Management:** Scans for the configured SSID and connects to the **strongest node/BSSID** for improved stability, with a fallback to **Access Point (AP) mode** if connection fails.
-* **MQTT Integration:** Publishes detailed JSON data payloads to a configurable MQTT Topic at a set interval, designed to integrate seamlessly with platforms like Home Assistant or Node-RED.
-* **Live Web Dashboard:** Provides a responsive, real-time web interface using **WebSockets** for live data visualization and a streaming log output.
+## 🛠️ Components & Dependencies
 
----
+### Hardware
+* **ESP32 Development Board** (e.g., ESP32-DevKitC)
+* **BME280** (Temperature, Humidity, Pressure sensor, typically I2C)
+* **GP2Y Dust Sensor** (Particulate Matter sensor, typically Analog/Digital with a control pin)
+* **MQ-135** (Air Quality/Gas sensor)
 
-## 🛠️ Components & Requirements
+### Software & Libraries
 
-| Component | Description | Integration |
-| :--- | :--- | :--- |
-| **Microcontroller** | ESP32 (Any variant) | WiFi, NVS, I2C, ADC |
-| **BME280** | Temperature, Humidity, Pressure Sensor | I2C |
-| **GP2Y10** | Analog Dust Sensor (PM approximation) | **Configurable** Analog Input, **Configurable** GPIO (for LED control) |
-| **MQ-135** (or similar) | Gas/Air Quality Sensor (TVOC/CO2 equivalent) | **Configurable** Analog Input (ADC) |
-| **Software** | AsyncWebServer, PubSubClient, Adafruit BME280, GP2YDustSensor, ArduinoJson (Libraries) | Required Libraries |
+The project relies on standard and common ESP32 libraries:
+* `Arduino.h`, `WiFi.h`
+* `PubSubClient` (for MQTT)
+* `ESPAsyncWebServer`, `AsyncTCP` (for Web Server and WebSocket)
+* `ArduinoOTA` (for Over-The-Air updates)
+* `Adafruit_BME280`
+* `ArduinoJson` (for serializing and deserializing data/config)
+* `Preferences` (for NVS configuration storage)
+* `GP2YDustSensor`
+* `mq135.h` (Custom or third-party library for MQ-135 handling)
 
----
+## 🔌 Wiring Guide
 
-## ⚙️ Setup and Configuration
+This guide assumes the use of an ESP32 board and common sensor modules. **Always verify the specific GPIO pins defined in your `config.h` file.**
 
-The device is designed for easy initial setup via its built-in Web Server.
-
-1.  **Initial Power-Up:** The ESP32 attempts to connect using saved credentials. If no valid configuration is found, or if connection fails, it starts in **Access Point (AP) Mode**.
-2.  **Connect to AP:** Connect your phone or PC to the WiFi network named **`ESP32-Weather-AP`** (Password: `12345678`).
-3.  **Access Settings:** Navigate to `http://192.168.4.1/settings` in your browser.
-4.  **Configure:** Enter your network credentials, MQTT server details, data `sendInterval`, **and the calibration parameters for the MQ-135 ($\mathbf{R_L}$, $\text{Rs/R}_0$ Baseline, TVOC Curve)**.
-5.  **Save & Reboot:** Click "Save & Reboot" to store the configuration in NVS and restart the device.
-
----
-
-## 📝 Data Structures
-
-### `AppConfig_t` (Non-Volatile Storage Configuration)
-
-This structure defines all configuration parameters saved persistently in the ESP32's NVS memory, using the provided defaults.
-
-| Field Name | Type | Default Value | Description |
+| Sensor / Module | Connection Pin | Default GPIO in `config.h` | Notes |
 | :--- | :--- | :--- | :--- |
-| `wifiSSID` | `char[32]` | `"HH"` | Target WiFi SSID. |
-| `wifiPass` | `char[64]` | `"12345678"` | Target WiFi Password. |
-| `mqttServer` | `char[64]` | `"pi.hoan.uk"` | MQTT Broker Hostname or IP. |
-| `mqttPort` | `uint16_t` | `1883` | MQTT Broker Port. |
-| `mqttUser` | `char[32]` | `"sensor"` | MQTT Username. |
-| `mqttPass` | `char[64]` | `"pass1234"` | MQTT Password. |
-| `mqttTopic` | `char[64]` | `"weather/data"` | MQTT Publish Topic. |
-| `sendInterval` | `uint32_t` | `5000` | Data publishing frequency (milliseconds). |
-| `ntpServer` | `char[64]` | `"pool.ntp.org"` | Network Time Server. |
-| `dustLEDPin` | `uint8_t` | `15` | GPIO for GP2Y10 LED control. |
-| `dustADCPin` | `uint8_t` | `35` | ADC pin for GP2Y10 sensor. |
-| `mqADCPin` | `uint8_t` | `34` | ADC pin for MQ-135 sensor. |
-| `mq_rl_kohm` | `float` | `10.0` | Load resistance ($\mathbf{R_L}$) in kOhm. |
-| `mq_r0_ratio_clean` | `float` | `3.6` | Rs/R0 ratio used for $\mathbf{R_0}$ calculation in clean air. |
-| `tvoc_a_curve` | `float` | `116.602` | Power curve A parameter for TVOC conversion. |
-| `tvoc_b_curve` | `float` | `-2.769` | Power curve B parameter for TVOC conversion. |
-| `mq_rzero` | `float` | `0.0` | Stored baseline resistance ($\mathbf{R_0}$) of the MQ-135. |
-| `deviceId` | `char[8]` | `"01"` | Unique device ID. |
-| `latitude` | `float` | `21.5` | Device latitude. |
-| `longitude` | `float` | `105.8` | Device longitude. |
+| **BME280** (I2C) | SDA | GPIO 21 | Standard I2C pins for ESP32. |
+| | SCL | GPIO 22 | |
+| **MQ-135** | Analog Output (A0) | GPIO 34 (`mqADCPin`) | Connects to an ADC pin on the ESP32. |
+| **GP2Y Dust Sensor** | V-LED (Control) | GPIO 15 (`dustLEDPin`) | Digital pin for controlling the IR LED. |
+| | V-OUT (Output) | GPIO 35 (`dustADCPin`) | Analog pin for reading voltage proportional to dust density. |
+| **Power & Ground** | VCC (5V or 3.3V) | - | Depends on the sensor module's required voltage. |
+| | GND | - | Connect all grounds together. |
 
-### Data Payload Format (MQTT/WebSocket)
 
-Data is published as a JSON string containing the measured and calculated values.
+
+## 🌐 Data Transmission Protocol (MQTT)
+
+The device utilizes **MQTT (Message Queuing Telemetry Transport)** to send sensor readings to a central server or broker.
+
+### 1. Topic Structure
+
+The device publishes data to a single, configurable topic. The default topic structure can be customized via the Web UI or in `config.h`.
+
+* **Configurable Topic:** `appConfig.mqttTopic`
+    * *Example (based on default settings):* `esp32/weather/data`
+
+### 2. Payload Format (JSON)
+
+Data is transmitted as a compressed JSON object to minimize payload size and bandwidth usage. This payload is generated by the `getDataJson()` function in `data_sensor.cpp`.
+
+| Key | Type | Description | Unit / Notes |
+| :--- | :--- | :--- | :--- |
+| `id` | `uint32` | Unique device identifier (`appConfig.deviceId`). | |
+| `t` | `float` | Temperature. | Celsius (°C) |
+| `h` | `float` | Relative Humidity. | Percent (%) |
+| `p` | `float` | Barometric Pressure. | hPa (Hectopascals) |
+| `pm` | `uint16` | PM2.5 / Dust Density. | $\mu g/m^3$ |
+| `aqi` | `int` | Calculated Air Quality Index for PM2.5. | US EPA standard. |
+| `mq` | `float` | Corrected MQ-135 Index value (Ratio Rs/R0). | Unitless Index (higher = worse quality). |
+| `ts` | `uint64` | Timestamp of data acquisition. | Microseconds since epoch. |
+
+#### Example JSON Payload:
 
 ```json
 {
-  "id": "01",              // Device ID (from config)
-  "t": 28.5,               // Temperature (°C) - Rounded to 1 decimal
-  "h": 65.2,               // Humidity (%) - Rounded to 1 decimal
-  "p": 1012.3,             // Pressure (hPa) - Rounded to 1 decimal
-  "pm": 15,                // Dust/PM raw density (approximation) - uint16_t
-  "mqr": 450,              // MQ135 ADC raw value (for debugging) - int
-  "mqp": 850,              // Corrected Air Quality concentration (PPM) - Rounded to 0 decimal
-  "aqi": 58,               // Total AQI (from PM2.5) - int
-  "ts": 1678886400123456   // Timestamp (microseconds) - uint64_t
+  "id": 12345678,
+  "t": 28.5,
+  "h": 65.2,
+  "p": 1012.3,
+  "pm": 25,
+  "aqi": 78,
+  "mq": 125,
+  "ts": 1672531200000000
 }
-```
 
 ## 📸 Screenshots
 
