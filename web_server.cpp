@@ -18,11 +18,15 @@
 
 
 #include <Update.h>
+#include <HTTPClient.h> // NEW: Include HTTPClient for downloading firmware
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 bool calibrating = false;
+
+// NEW: Global variable to hold the URL for OTA update
+String g_ota_url = "";
 
 
 // --- WebSocket ---
@@ -59,6 +63,118 @@ void sendWSData(const char *json) {
   ws.textAll(json);
 }
 
+
+// --- OTA from URL Logic ---
+void startOtaFromUrl(const char *url) {
+    addLogf("OTA URL: Starting update from %s", url);
+
+    // Use WiFiClient for HTTP
+    WiFiClient client;
+    HTTPClient http;
+
+    if (!http.begin(client, url)) {
+        addLog("HTTP: Failed to connect or invalid URL.");
+        return;
+    }
+
+    http.addHeader("User-Agent", "ESP32-OTA-Agent/1.0");
+    http.addHeader("Accept", "*/*");
+
+    int httpCode = http.GET();
+    if (httpCode != HTTP_CODE_OK) {
+        addLogf("HTTP: GET failed. Code: %d", httpCode);
+        http.end();
+        return;
+    }
+
+    int contentLength = http.getSize();
+    if (contentLength <= 0) {
+        addLog("HTTP: Invalid content length or file size.");
+        http.end();
+        return;
+    }
+
+    addLogf("Firmware size: %d bytes", contentLength);
+
+    if (!Update.begin(contentLength)) {
+        addLog("Update: Failed to begin update.");
+        Update.printError(Serial);
+        http.end();
+        return;
+    }
+
+    // === Robust Download and Write Logic ===
+
+    WiFiClient *stream = http.getStreamPtr();
+    size_t written = 0;
+    size_t totalWritten = 0;
+
+    // Tải xuống theo từng khối 1024 bytes
+    uint8_t buff[1024] = {0};
+    int bytesRead = 0;
+
+    // Lặp cho đến khi hết luồng
+    while (stream->connected() && (totalWritten < contentLength || contentLength == -1)) {
+        // Đọc dữ liệu nếu có sẵn
+        bytesRead = stream->readBytes(buff, sizeof(buff));
+
+        if (bytesRead > 0) {
+            // Ghi dữ liệu vào Update
+            written = Update.write(buff, bytesRead);
+            totalWritten += written;
+
+            // Log tiến trình mỗi 5% (tùy chọn)
+            static int lastProgress = 0;
+            int progress = (totalWritten * 100) / contentLength;
+            if (progress - lastProgress >= 5) {
+                addLogf("OTA Progress: %d%% (%u bytes)", progress, totalWritten);
+                lastProgress = progress;
+            }
+
+            if (written != bytesRead) {
+                // Lỗi ghi vào bộ nhớ flash
+                addLog("Update write error!");
+                break;
+            }
+        } else if (bytesRead == -1) {
+            // Lỗi đọc stream
+            addLog("Stream read error!");
+            break;
+        }
+
+        // Dừng nếu đạt đến ContentLength và đã đọc xong
+        if (contentLength != -1 && totalWritten >= contentLength) break;
+    }
+
+    // Kiểm tra kết quả
+    if (totalWritten == contentLength) {
+        addLogf("Update: Successfully wrote %u bytes.", totalWritten);
+    } else {
+        addLogf("Update: Final check failed. Wrote %u/%u bytes.", totalWritten, contentLength);
+    }
+
+    http.end(); // Close the HTTP connection
+
+    if (Update.end(true)) {
+        addLog("Update Success. Rebooting...");
+        delay(1000);
+        ESP.restart();
+    } else {
+        addLog("Update failed!");
+        Update.printError(Serial);
+    }
+}
+
+// Hàm này cần được gọi trong loop() để kích hoạt OTA
+void handleOtaUrlInLoop() {
+  if (g_ota_url.length() > 0) {
+    String urlCopy = g_ota_url;
+    g_ota_url = ""; // Clear the flag immediately
+
+    // Execute the OTA update (this will be blocking)
+    startOtaFromUrl(urlCopy.c_str());
+  }
+}
 // ======== Setup server ========
 void setupWebServer() {
   ws.onEvent(onWsEvent);
@@ -111,9 +227,11 @@ void setupWebServer() {
   // Update from URL
   server.on(
     "/update-url", HTTP_POST, [](AsyncWebServerRequest *request) {
-      request->send(200, "text/plain", "Starting OTA from URL...");
+      // Send quick response to prevent browser timeout
+      request->send(200, "text/plain", "OTA process initiated. Check log for details.");
     },
     NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+      // Parse the JSON body to get the URL
       StaticJsonDocument<256> doc;
       DeserializationError err = deserializeJson(doc, data, len);
       if (err) {
@@ -121,7 +239,14 @@ void setupWebServer() {
         return;
       }
       const char *url = doc["url"];
-      addLogf("OTA from URL: %s\n", url);
+
+      // Store the URL globally to be processed in the main loop()
+      if (url && strlen(url) > 0) {
+          g_ota_url = String(url);
+          addLogf("OTA URL received: %s. Starting update shortly...", url);
+      } else {
+          addLog("OTA URL received was empty.");
+      }
     });
 
   server.on("/dashboard.js", HTTP_GET, [](AsyncWebServerRequest *request) {

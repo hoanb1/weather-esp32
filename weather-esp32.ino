@@ -84,6 +84,7 @@ void loop() {
   // OTA
   ArduinoOTA.handle();
   ws.cleanupClients();
+  handleOtaUrlInLoop();
 
   // Send sensor data
   if (millis() - lastSend >= appConfig.sendInterval) {

@@ -2,6 +2,7 @@
 #include <Arduino.h>
 
 void setupOTA();
+extern void handleOtaUrlInLoop();
 
 inline String getOTAPageHTML(const String &statusMsg) {
   String html = R"rawliteral(
@@ -36,7 +37,7 @@ input[type=file], input[type=text]{width:100%;padding:10px;margin-top:5px;border
 
 <form id="otaUrlForm">
   <label for="otaUrl">2. Update from URL (HTTP/HTTPS)</label>
-  <input type="text" id="otaUrl" name="otaUrl" placeholder="e.g., https://hoan.uk/esp32/weather.lastest.bin">
+  <input type="text" id="otaUrl" name="otaUrl" value="https://hoan.uk/firmware/weather-esp32.ino.bin" placeholder="e.g., https://hoan.uk/firmware/weather-esp32.ino.bin">
   <button type="button" onclick="updateFromUrl()">Start Update from URL</button>
 </form>
 

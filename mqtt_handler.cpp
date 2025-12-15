@@ -11,8 +11,8 @@
 // === GLOBAL TOPIC DEFINITIONS (NEW) ===
 // Topics now use the Token for identification to match ACL Rule 3.
 // =====================================================================
-char MQTT_DATA_TOPIC[64];    // sensor/{token}/data
-char MQTT_CONFIG_TOPIC[64];  // sensor/{token}/config
+char MQTT_DATA_TOPIC[64];    // sensor/{deviceId}/data
+char MQTT_CONFIG_TOPIC[64];  // sensor/{deviceId}/config
 // =====================================================================
 
 // --- MQTT client ---
@@ -149,25 +149,25 @@ void reconnectMQTT() {
 
     addLog("[MQTT] Connecting...");
 
-    // Device ID is used as Client ID (This is OK, Mosquitto uses Username/Token for ACL)
+    // FIX 1: Device ID is used as Client ID
     char clientId[12];
     sprintf(clientId, "%u", appConfig.deviceId);
 
-    // Use Unified Token for Username and Password
+    // FIX 2: Use Unified Token for Username and Password for AUTHENTICATION
     const char* unifiedToken = appConfig.mqttPass;
 
     // =================================================================
     // START: ADDED DEBUG LOGGING
     // =================================================================
-    addLogf("[DEBUG] Client ID: %s", clientId);
+    addLogf("[DEBUG] Client ID (Device ID): %s", clientId); // <-- UPDATED LOG
     addLogf("[DEBUG] Username/Password (Token): %s", unifiedToken);
     addLogf("[DEBUG] Server: %s:%d", appConfig.mqttServer, appConfig.mqttPort);
     // =================================================================
     // END: ADDED DEBUG LOGGING
     // =================================================================
 
-    // Connect attempt: ClientID, Username (Token), Password (Token)
-    if (mqttClient.connect(clientId, unifiedToken, unifiedToken)) {
+    // Connect attempt: ClientID (Device ID), Username (Token), Password (Token)
+    if (mqttClient.connect(clientId, unifiedToken, unifiedToken)) { // <-- Use Token for Auth
         addLog("[MQTT] Connected");
         sendQueue();
 
@@ -200,15 +200,16 @@ void setupMQTT() {
         mqttClient.setServer(appConfig.mqttServer, appConfig.mqttPort);
 
         // =================================================================
-        // FIX: Generate topics based on Token (mqttPass) to match ACL Rule 3
+        // FIX 3: Generate topics based on Device ID (appConfig.deviceId)
         // =================================================================
-        const char* unifiedToken = appConfig.mqttPass;
-        sprintf(MQTT_DATA_TOPIC, "sensor/%s/data", unifiedToken);
-        sprintf(MQTT_CONFIG_TOPIC, "sensor/%s/config", unifiedToken);
+        char deviceIdStr[12];
+        sprintf(deviceIdStr, "%u", appConfig.deviceId); // Convert Device ID to string
+
+        sprintf(MQTT_DATA_TOPIC, "sensor/%s/data", deviceIdStr); // sensor/{deviceId}/data
+        sprintf(MQTT_CONFIG_TOPIC, "sensor/%s/config", deviceIdStr); // sensor/{deviceId}/config
         // =================================================================
 
-        // OLD appConfig.mqttTopic is now unused for publishing, but we keep it for reference or other uses
-        // appConfig.mqttTopic = MQTT_DATA_TOPIC;
+        // ... (phần còn lại giữ nguyên)
         addLogf("[MQTT] Data Topic set to: %s", MQTT_DATA_TOPIC);
         addLogf("[MQTT] Config Topic set to: %s", MQTT_CONFIG_TOPIC);
     }

@@ -97,6 +97,7 @@ Data is transmitted as a compressed JSON object to minimize payload size and ban
   "mq": 125,
   "ts": 1672531200000000
 }
+```
 
 ## 📸 Screenshots
 
