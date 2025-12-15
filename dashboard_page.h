@@ -38,7 +38,9 @@ body {
     padding: 0;
     color: var(--color-text-dark);
 }
-
+#timeRangeSelect{
+    border: none;
+}
 /* --- Navbar (Minimal change - keep structure) --- */
 .navbar {
     background: var(--color-surface); /* Changed to white surface */
@@ -86,8 +88,8 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 25px;
-    padding: 15px 0; /* Removed horizontal padding/background for flat look */
-    background: transparent; /* No background */
+    padding: 15px 12px; /* Removed horizontal padding/background for flat look */
+    background: #ffffff8c;
     border-radius: 0;
     box-shadow: none; /* No shadow */
     border-bottom: 1px solid var(--color-line-separator); /* Thin separator line */
@@ -248,7 +250,7 @@ Here, we keep it simple: separated by background and line.
     </div>
 
     <div class="time-control">
-        <label for="timeRangeSelect">Time Range:</label>
+
         <select id="timeRangeSelect">
             <option value="60">1 min</option>
             <option value="300">5 min</option>

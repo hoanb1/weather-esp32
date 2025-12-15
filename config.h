@@ -1,10 +1,12 @@
+// config.h
 #pragma once
 
 #include <Arduino.h>
 
 #define LOG_BUFFER_SIZE 10
 #define PREFERENCES_NAMESPACE "weather_cfg"
-#define DEVICE_ID_MAX_LEN 32
+#define MQTT_CONFIG_TOPIC "weather/config"
+
 
 // --- App Configuration ---
 typedef struct {
@@ -17,6 +19,7 @@ typedef struct {
   uint16_t mqttPort;
   char mqttUser[32];
   char mqttPass[64];
+
   char mqttTopic[64];
   bool mqttEnabled;
 
@@ -43,9 +46,11 @@ typedef struct {
   bool autoCalibrateOnBoot;
 
   // Device Info
-  char deviceId[DEVICE_ID_MAX_LEN];
+  uint32_t deviceId;
   float latitude;
   float longitude;
+  char stationName[64];
+  char stationDescription[128];
 
 } AppConfig_t;
 

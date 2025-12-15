@@ -3,12 +3,17 @@
 #include <SPIFFS.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <ArduinoJson.h> // Assuming you use ArduinoJson
 #include "config.h"
+#include "data.h"
 
 // --- MQTT client ---
-static WiFiClient wifiClient;
-static PubSubClient mqttClient(wifiClient);
+PubSubClient mqttClient(wifiClient);
 static unsigned long lastQueueSend = 0;
+
+// --- SPIFFS Status ---
+static bool isSpiffsMounted = false;
+static bool hasSpiffsAttempted = false; // Tracks if SPIFFS.begin() has ever been called
 
 // --- RAM queue ---
 #define MAX_RAM_QUEUE 100
@@ -18,6 +23,23 @@ static uint8_t ramQueueCount = 0;
 static unsigned long lastReconnectAttempt = 0;
 const unsigned long RECONNECT_INTERVAL = 5000; // 5s
 
+// =====================================================================
+// JSON generator for Static Info
+// =====================================================================
+String getStaticInfoJson() {
+    StaticJsonDocument<512> doc;
+    doc["id"] = appConfig.deviceId;
+    doc["type"] = "config"; // Mark as configuration payload
+    doc["lat"] = appConfig.latitude;
+    doc["lon"] = appConfig.longitude;
+    doc["stationName"] = appConfig.stationName;
+    doc["stationDescription"] = appConfig.stationDescription;
+
+    String json;
+    serializeJson(doc, json);
+    return json;
+}
+
 // --- Append JSON to RAM/File queue ---
 void appendToQueue(const String &json) {
     if (ramQueueCount < MAX_RAM_QUEUE) {
@@ -26,17 +48,25 @@ void appendToQueue(const String &json) {
         return;
     }
 
-    // RAM đầy → kiểm tra SPIFFS trước
-    if (SPIFFS.begin()) {  // nếu SPIFFS mount thành công
-        if (!SPIFFS.exists("/mqtt_queue.txt")) {
-            File f = SPIFFS.open("/mqtt_queue.txt", "w");
-            if(f) f.close();
+    // RAM full -> check SPIFFS first
+    if (!isSpiffsMounted && !hasSpiffsAttempted) {
+        hasSpiffsAttempted = true;
+        if (SPIFFS.begin()) {
+            isSpiffsMounted = true;
+            addLog("[MQTT] SPIFFS mounted successfully.");
+        } else {
+            addLog("[MQTT] SPIFFS mount failed (permanently disabled for this session).");
+            return;
         }
+    }
 
+    // If mounted (isSpiffsMounted == true)
+    if (isSpiffsMounted) {
+        // ... (File writing logic, kept brief for focus)
         File f = SPIFFS.open("/mqtt_queue.txt", "a");
         if(f) {
             for(uint8_t i = 0; i < ramQueueCount; i++) f.println(ramQueue[i]);
-            f.println(json); // thêm record mới
+            f.println(json); // add new record
             f.close();
             addLogf("[MQTT] RAM queue flushed to file (%d records)", ramQueueCount+1);
             ramQueueCount = 0;
@@ -44,8 +74,7 @@ void appendToQueue(const String &json) {
         }
     }
 
-    // Nếu không có SPIFFS hoặc mở file fail, chỉ giữ trong RAM
-    addLog("[MQTT] RAM full, cannot flush to file, keeping in RAM");
+    addLog("[MQTT] RAM full, file operation failed, keeping data in RAM.");
 }
 
 // --- Send a single JSON safely ---
@@ -55,6 +84,7 @@ void sendMQTT(const String &json) {
         return;
     }
 
+    // Note: This function is for data topic (appConfig.mqttTopic)
     if (!mqttClient.publish(appConfig.mqttTopic, json.c_str())) {
         addLog("[MQTT] Publish failed, added to queue");
         appendToQueue(json);
@@ -62,17 +92,19 @@ void sendMQTT(const String &json) {
        // addLog("[MQTT] Message sent successfully");
     }
 }
+
 void sendQueue() {
     if (!mqttClient.connected()) return;
 
     // RAM queue first
     for(uint8_t i = 0; i < ramQueueCount; i++) {
+        // Note: sendMQTT will re-queue if publish fails
         sendMQTT(ramQueue[i]);
     }
     ramQueueCount = 0;
 
-    // Kiểm tra SPIFFS trước khi xử lý file queue
-    if (!SPIFFS.begin()) return;  // nếu không mount được, bỏ qua
+    // Check SPIFFS and process file queue
+    if (!isSpiffsMounted) return;
 
     if (!SPIFFS.exists("/mqtt_queue.txt")) return;
 
@@ -88,7 +120,7 @@ void sendQueue() {
         if(line.length() == 0) continue;
 
         if (!mqttClient.publish(appConfig.mqttTopic, line.c_str())) {
-            temp.println(line); // giữ lại các dòng chưa gửi
+            temp.println(line); // keep unsent lines
         }
     }
 
@@ -107,24 +139,56 @@ void reconnectMQTT() {
     lastReconnectAttempt = now;
 
     addLog("[MQTT] Connecting...");
-    String clientId = "ESP32Weather-" + String(random(0xffff), HEX);
 
-    if (mqttClient.connect(clientId.c_str(), appConfig.mqttUser, appConfig.mqttPass)) {
+    char clientId[12];
+    sprintf(clientId, "%u", appConfig.deviceId);
+
+    // Use Unified Token for Username and Password
+    const char* unifiedToken = appConfig.mqttPass;
+
+    // =================================================================
+    // START: ADDED DEBUG LOGGING
+    // =================================================================
+    addLogf("[DEBUG] Client ID: %s", clientId);
+    addLogf("[DEBUG] Username/Password (Token): %s", unifiedToken);
+    addLogf("[DEBUG] Server: %s:%d", appConfig.mqttServer, appConfig.mqttPort);
+    // =================================================================
+    // END: ADDED DEBUG LOGGING
+    // =================================================================
+
+    // Connect attempt: ClientID, Username (Token), Password (Token)
+    if (mqttClient.connect(clientId, unifiedToken, unifiedToken)) {
         addLog("[MQTT] Connected");
         sendQueue();
+
+        String staticInfo = getStaticInfoJson();
+
+        // =================================================================
+        // START: ADDED DEBUG LOGGING
+        // =================================================================
+        addLogf("[DEBUG] Config Topic: %s", MQTT_CONFIG_TOPIC);
+        addLogf("[DEBUG] Config Payload: %s", staticInfo.c_str());
+        // =================================================================
+        // END: ADDED DEBUG LOGGING
+        // =================================================================
+
+        if (mqttClient.publish(MQTT_CONFIG_TOPIC, staticInfo.c_str())) {
+            addLog("[MQTT] Static configuration info sent.");
+        } else {
+            addLog("[MQTT] Failed to send static configuration info.");
+        }
     } else {
         addLogf("[MQTT] Connection failed, rc=%d", mqttClient.state());
     }
 }
 
-// --- Setup MQTT ---
+// --- Setup MQTT and Loop MQTT (Kept the same) ---
 void setupMQTT() {
     if (appConfig.mqttEnabled) {
         mqttClient.setServer(appConfig.mqttServer, appConfig.mqttPort);
     }
 }
 
-// --- Loop MQTT ---
 void loopMQTT() {
     if (!appConfig.mqttEnabled) return;
 

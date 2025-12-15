@@ -248,7 +248,7 @@ function loadTimeRange() {
 // --- WebSocket (UPDATED to use Highcharts Gauge Update) ---
 
 function connectWS(){
-    ws = new WebSocket("ws://"+location.hostname+"/ws");
+    ws = new WebSocket("/ws");
     
     ws.onopen = ()=>{
        // console.log("WebSocket connected");

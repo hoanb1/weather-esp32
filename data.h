@@ -18,7 +18,7 @@ extern MQ135* mq135;
 // --- External Objects ---
 extern AsyncWebServer server;
 extern AsyncWebSocket ws;
-extern WiFiClient espClient;
+extern WiFiClient wifiClient;
 extern PubSubClient mqttClient;
 
 extern AppConfig_t appConfig;
@@ -54,3 +54,7 @@ void maintainWiFi();
 // --- MQ135 ---
 void initMQ135();
 float calibrateMQ135();
+
+
+//MQTT
+String getStaticInfoJson();

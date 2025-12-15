@@ -16,7 +16,6 @@
 const unsigned long SYSTEM_INFO_INTERVAL = 10000;
 
 WiFiClient wifiClient;
-PubSubClient mqttClient(wifiClient);
 
 String latestJson = "{}";
 unsigned long lastSend = 0;
@@ -32,7 +31,7 @@ void logAppConfig() {
   addLogf("Dust LED Pin: %d, Dust ADC Pin: %d", appConfig.dustLEDPin, appConfig.dustADCPin);
   addLogf("MQ135 ADC Pin: %d", appConfig.mqADCPin);
 
-  addLogf("Device ID: %s", appConfig.deviceId);
+addLogf("Device ID: %u", appConfig.deviceId);
   addLogf("Location: %.6f, %.6f", appConfig.latitude, appConfig.longitude);
 
   addLog("----------------");

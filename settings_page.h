@@ -38,9 +38,13 @@ h3{color:#34495e;margin-top:20px;padding-bottom:5px;border-bottom:1px dashed #cc
 <div class="status">Status: <span>)rawliteral"
                 + statusMsg + R"rawliteral(</span></div>
 <form id="configForm">
-
 <h3>General & Network</h3>
-<div class="form-row"><label for="deviceId">Device ID:</label><input type="text" id="deviceId" name="deviceId"></div>
+<div class="form-row">
+  <label for="deviceId">Device ID (Read-only):</label>
+  <input type="text" id="deviceId" name="deviceId" readonly>
+</div>
+<div class="form-row"><label for="stationName">Station Name:</label><input type="text" id="stationName" name="stationName"></div>
+<div class="form-row"><label for="stationDescription">Description:</label><input type="text" id="stationDescription" name="stationDescription"></div>
 <div class="form-row"><label for="latitude">Latitude:</label><input type="number" step="0.000001" id="latitude" name="latitude"></div>
 <div class="form-row"><label for="longitude">Longitude:</label><input type="number" step="0.000001" id="longitude" name="longitude"></div>
 <div class="form-row"><label for="wifiSSID">WiFi SSID:</label><input type="text" id="wifiSSID" name="wifiSSID"></div>
@@ -55,8 +59,8 @@ h3{color:#34495e;margin-top:20px;padding-bottom:5px;border-bottom:1px dashed #cc
 
 <div class="form-row"><label for="mqttServer">MQTT Server:</label><input type="text" id="mqttServer" name="mqttServer"></div>
 <div class="form-row"><label for="mqttPort">MQTT Port:</label><input type="number" id="mqttPort" name="mqttPort"></div>
-<div class="form-row"><label for="mqttUser">MQTT User:</label><input type="text" id="mqttUser" name="mqttUser"></div>
-<div class="form-row"><label for="mqttPass">MQTT Password:</label><input type="password" id="mqttPass" name="mqttPass"></div>
+
+<div class="form-row"><label for="mqttPass">Unified Token/API Key:</label><input type="text" id="mqttPass" name="mqttPass"></div>
 <div class="form-row"><label for="mqttTopic">MQTT Topic:</label><input type="text" id="mqttTopic" name="mqttTopic"></div>
 <div class="form-row"><label for="sendInterval">Send Interval (ms):</label><input type="number" id="sendInterval" name="sendInterval"></div>
 
@@ -99,7 +103,12 @@ for(const key in configData) {
         if(input.type === 'checkbox') {
             input.checked = configData[key] === true || configData[key] === "true";
         } else {
-            input.value = configData[key];
+
+			if (key === 'deviceId') {
+                input.value = configData[key];
+                continue;
+            }
+			input.value = configData[key];
             if (input.type === 'password' && input.value !== "") {
                 input.placeholder = '****** (Set)';
                 input.value = '';

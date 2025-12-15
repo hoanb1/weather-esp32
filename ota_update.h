@@ -46,7 +46,7 @@ input[type=file], input[type=text]{width:100%;padding:10px;margin-top:5px;border
 let ws;
 
 function connectWS() {
-  ws = new WebSocket("ws://" + location.host + "/ws");
+  ws = new WebSocket("/ws");
 
   ws.onmessage = (event) => {
     try {
