@@ -38,6 +38,7 @@ const AppConfig_t defaultConfig = {
 
   .pmsRxPin = 17,
   .pmsTxPin = 16,
+  .pmsSetPin = -1,
 
   .mq_rl_kohm = 1.0,
   .mq_r0_ratio_clean = 3.6,
@@ -107,7 +108,7 @@ void addLog(const char* msg) {
   logBuffer[logIndex].message = msg;
   logIndex = (logIndex + 1) % LOG_BUFFER_SIZE;
 
-  StaticJsonDocument<256> doc;
+  StaticJsonDocument<1024> doc;
   doc["type"] = "log";
   doc["msg"] = msg;
 
@@ -119,7 +120,7 @@ void addLog(const char* msg) {
 }
 
 void addLogf(const char* format, ...) {
-  char buf[256];
+  char buf[1024];
   va_list args;
   va_start(args, format);
   vsnprintf(buf, sizeof(buf), format, args);

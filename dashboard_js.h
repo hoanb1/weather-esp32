@@ -332,9 +332,10 @@ function connectWS(){
         let log = document.getElementById("logArea");
         const now = new Date();
         const timeStr =
-            now.toLocaleTimeString("en-GB") +
-            "." +
-            String(now.getMilliseconds()).padStart(3, "0");
+            now.toLocaleTimeString("en-GB")
+            //+"."
+            //+String(now.getMilliseconds()).padStart(3, "0")
+            ;
         const msg = d.msg ? d.msg : JSON.stringify(d);
         log.innerText += `[${timeStr}] ${msg}\n`;
         log.scrollTop = log.scrollHeight;

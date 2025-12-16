@@ -38,6 +38,7 @@ typedef struct {
 
   uint8_t pmsRxPin; // Pin 27
   uint8_t pmsTxPin; // Pin 26
+  int pmsSetPin; // Pin 26
 
   // MQ135 Calibration
   float mq_rl_kohm;

@@ -97,7 +97,7 @@ void loop() {
     notifyClients(latestJson);
 
     if (appConfig.mqttEnabled) sendMQTT(latestJson);
-    addLogf("[INFO] Sent data to MQTT: %s", latestJson.c_str());
+    //addLogf("[INFO] Sent data to MQTT: %s", latestJson.c_str());
 
     lastSend = millis();
 

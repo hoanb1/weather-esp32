@@ -218,11 +218,12 @@ Here, we keep it simple: separated by background and line.
     padding-top: 10px;
 }
 #logArea {
-    height: 250px; 
+    height: 450px;
     overflow-y: auto;
     background: #1e2a36; 
-    color: #3498db; 
+    color: #ffffff;
     padding: 10px;
+    font-size: 0.8em;
     font-family: 'Consolas', 'Courier New', monospace;
     border-radius: 4px;
     white-space: pre-wrap;

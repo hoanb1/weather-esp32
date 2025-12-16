@@ -60,13 +60,14 @@ void initPMS7003() {
   pms7003 = new RawPMS7003(
     Serial2,
     appConfig.pmsRxPin,
-    appConfig.pmsTxPin);
+    appConfig.pmsTxPin,
+    appConfig.pmsSetPin);
 
   pms7003->begin();
 
   pmsInitialized = true;
-  addLogf("[PMS7003] Initialized on RX:%d, TX:%d (9600 baud)",
-          appConfig.pmsRxPin, appConfig.pmsTxPin);
+  addLogf("[PMS7003] Initialized on RX:%d, TX:%d, SET:%d (9600 baud)",
+          appConfig.pmsRxPin, appConfig.pmsTxPin, appConfig.pmsSetPin);
 }
 
 // =====================================================================
@@ -190,30 +191,43 @@ String getDataJson() {
   String json;
   serializeJson(doc, json);
 
-  // =================================================================
-  // Debug Log
-  // =================================================================
-  addLogf("[DEBUG] BME280: T=%.1f C, H=%.1f%%, P=%.1f hPa | "
-          "PMS7003: PM2.5=%u ug/m3 (Status:%s) | "
-          "GP2Y: PM2.5_eq=%u ug/m3 (AQI=%d) | "
-          "MQ135: Index=%.0f | "
-          "JSON PM/AQI Source: %s",
-          t, h, p,
-          pms_pm25_read, pms_log_status.c_str(),
-          gp2y_pm, gp2y_aqi,
-          mqIndex,
-          pms_read_ok ? "PMS7003 (Custom)" : "GP2Y");
+
+
+#define PMS_LOG_BUFFER_SIZE 1024
+  char pms_detail_buffer[PMS_LOG_BUFFER_SIZE] = "";
 
   if (pms_read_ok) {
-    addLogf("[PMS7003 DETAIL] Mass Std (1.0/2.5/10.0): %u/%u/%u",
-            pms7003->data.pm1_0_std, pms7003->data.pm2_5_std, pms7003->data.pm10_0_std);
 
-    addLogf("[PMS7003 DETAIL] Mass ATM (1.0/2.5/10.0): %u/%u/%u",
-            pms7003->data.pm1_0_atm, pms7003->data.pm2_5_atm, pms7003->data.pm10_0_atm);
+    snprintf(
+      pms_detail_buffer,
+      PMS_LOG_BUFFER_SIZE,
+      " | "
+      "PMS7003_MASS{PM1.0_Std=%u, PM2.5_Std=%u, PM10_Std=%u (USED_AQI)} | "
+      "PMS7003_MASS_ATM{PM1.0_Atm=%u, PM2.5_Atm=%u, PM10_Atm=%u (NOT_USED_AQI)} | "
+      "PMS7003_PARTICLE_COUNT{PC_0.3um=%u, PC_2.5um=%u, PC_10um=%u}",
+      pms7003->data.pm1_0_std, pms7003->data.pm2_5_std, pms7003->data.pm10_0_std,
+      pms7003->data.pm1_0_atm, pms7003->data.pm2_5_atm, pms7003->data.pm10_0_atm,
+      pms7003->data.count_0_3um, pms7003->data.count_2_5um, pms7003->data.count_10_0um);
+  } else {
 
-    addLogf("[PMS7003 DETAIL] Counts (0.3/2.5/10.0): %u/%u/%u (#/0.1L)",
-            pms7003->data.count_0_3um, pms7003->data.count_2_5um, pms7003->data.count_10_0um);
+    pms_detail_buffer[0] = '\0';
   }
+
+
+  addLogf(
+    "[DATA] "
+    "BME280{T=%.1f C, H=%.1f %%, P=%.1f hPa} | "
+    "PMS7003{PM2.5_Std= %u ug/m3, Status=%s} | "
+    "GP2Y{PM2.5_Eq=%u ug/m3, AQI_GP2Y=%d} | "
+    "MQ135{AQI_MQ135=%.0f} | "
+    "FinalSource=%s"
+    "%s",
+    t, h, p,
+    pms_pm25_read, pms_log_status.c_str(),
+    gp2y_pm, gp2y_aqi,
+    mqIndex,
+    pms_read_ok ? "PMS7003_SENSOR" : "GP2Y_SENSOR",
+    pms_detail_buffer);
 
   return json;
 }

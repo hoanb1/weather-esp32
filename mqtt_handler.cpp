@@ -61,7 +61,7 @@ void appendToQueue(const String &json) {
         hasSpiffsAttempted = true;
         if (SPIFFS.begin()) {
             isSpiffsMounted = true;
-            addLog("[MQTT] SPIFFS mounted successfully.");
+            //addLog("[MQTT] SPIFFS mounted successfully.");
         } else {
             addLog("[MQTT] SPIFFS mount failed (permanently disabled for this session).");
             return;
@@ -97,7 +97,7 @@ void sendMQTT(const String &json) {
         addLogf("[MQTT] Publish failed, added to queue topic=%s", MQTT_DATA_TOPIC);
         appendToQueue(json);
     } else {
-        addLogf("[MQTT] Message sent successfully topic=%s", MQTT_DATA_TOPIC);
+       // addLogf("[MQTT] Message sent successfully topic=%s", MQTT_DATA_TOPIC);
     }
 }
 
