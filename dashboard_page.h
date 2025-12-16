@@ -1,3 +1,5 @@
+// dashboard_page.h
+
 #pragma once
 #include <Arduino.h>
 
@@ -286,21 +288,31 @@ Here, we keep it simple: separated by background and line.
 </div>
 
 <div class="data-tile">
-  <h4 class="tile-header">PM2.5 (µg/m³)</h4>
-  <div id="gaugeDust" class="gauge-container"></div>
-  <div id="chartDust" class="chart-container"></div>
+  <h4 class="tile-header">PM2.5 (PMS) (µg/m³)</h4>
+  <div id="gaugePM25" class="gauge-container"></div>
+  <div id="chartPM25" class="chart-container"></div>
 </div>
 
 <div class="data-tile">
-  <h4 class="tile-header">Air Quality Index (AQI)</h4>
-  <div id="gaugeAQI" class="gauge-container"></div>
-  <div id="chartAQI" class="chart-container"></div>
+  <h4 class="tile-header">Overall AQI</h4>
+  <div id="gaugeAQIOverall" class="gauge-container"></div>
+  <div id="chartAQIOverall" class="chart-container"></div>
 </div>
 
 <div class="data-tile">
   <h4 class="tile-header">MQ Gas Index</h4>
   <div id="gaugeMQ" class="gauge-container"></div>
   <div id="chartMQ" class="chart-container"></div>
+</div>
+
+<div class="data-tile combined-chart-tile">
+  <h4 class="tile-header">Particulate Matter (µg/m³) Comparison</h4>
+  <div id="chartParticulateMatter" class="chart-container" style="min-height: 300px;"></div>
+</div>
+
+<div class="data-tile combined-chart-tile">
+  <h4 class="tile-header">AQI Comparison</h4>
+  <div id="chartAQIComparison" class="chart-container" style="min-height: 300px;"></div>
 </div>
 
 </section>
