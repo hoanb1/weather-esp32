@@ -12,7 +12,7 @@
 // Topics now use the Token for identification to match ACL Rule 3.
 // =====================================================================
 char MQTT_DATA_TOPIC[64];    // sensor/{deviceId}/data
-char MQTT_CONFIG_TOPIC[64];  // sensor/{deviceId}/config
+const char* MQTT_CONFIG_TOPIC = "sensor/config";
 // =====================================================================
 
 // --- MQTT client ---
@@ -36,8 +36,9 @@ const unsigned long RECONNECT_INTERVAL = 5000; // 5s
 // =====================================================================
 String getStaticInfoJson() {
     StaticJsonDocument<512> doc;
-    doc["id"] = appConfig.deviceId;
-    doc["type"] = "config"; // Mark as configuration payload
+    doc["deviceId"] = appConfig.deviceId;
+    doc["type"] = "config";
+	doc["token"] = appConfig.mqttPass;
     doc["lat"] = appConfig.latitude;
     doc["lon"] = appConfig.longitude;
     doc["stationName"] = appConfig.stationName;
@@ -206,7 +207,7 @@ void setupMQTT() {
         sprintf(deviceIdStr, "%u", appConfig.deviceId); // Convert Device ID to string
 
         sprintf(MQTT_DATA_TOPIC, "sensor/%s/data", deviceIdStr); // sensor/{deviceId}/data
-        sprintf(MQTT_CONFIG_TOPIC, "sensor/%s/config", deviceIdStr); // sensor/{deviceId}/config
+
         // =================================================================
 
         // ... (phần còn lại giữ nguyên)

@@ -38,7 +38,8 @@ h3{color:#34495e;margin-top:20px;padding-bottom:5px;border-bottom:1px dashed #cc
 <div class="status">Status: <span>)rawliteral"
                 + statusMsg + R"rawliteral(</span></div>
 <form id="configForm">
-<h3>General & Network</h3>
+
+<h3>I. General & Location</h3>
 <div class="form-row">
   <label for="deviceId">Device ID (Read-only):</label>
   <input type="text" id="deviceId" name="deviceId" readonly>
@@ -47,11 +48,13 @@ h3{color:#34495e;margin-top:20px;padding-bottom:5px;border-bottom:1px dashed #cc
 <div class="form-row"><label for="stationDescription">Description:</label><input type="text" id="stationDescription" name="stationDescription"></div>
 <div class="form-row"><label for="latitude">Latitude:</label><input type="number" step="0.000001" id="latitude" name="latitude"></div>
 <div class="form-row"><label for="longitude">Longitude:</label><input type="number" step="0.000001" id="longitude" name="longitude"></div>
+
+<h3>II. Network & WiFi</h3>
 <div class="form-row"><label for="wifiSSID">WiFi SSID:</label><input type="text" id="wifiSSID" name="wifiSSID"></div>
 <div class="form-row"><label for="wifiPass">WiFi Password:</label><input type="password" id="wifiPass" name="wifiPass"></div>
-<div class="form-row"><label for="ntpServer">NTP Server:</label><input type="text" id="ntpServer" name="ntpServer"></div>
 
-<h3>MQTT Settings</h3>
+
+<h3>III. MQTT & Data Service</h3>
 <div class="form-row">
   <label for="mqttEnabled">Enable MQTT:</label>
   <input type="checkbox" id="mqttEnabled" name="mqttEnabled">
@@ -61,26 +64,47 @@ h3{color:#34495e;margin-top:20px;padding-bottom:5px;border-bottom:1px dashed #cc
 <div class="form-row"><label for="mqttPort">MQTT Port:</label><input type="number" id="mqttPort" name="mqttPort"></div>
 
 <div class="form-row"><label for="mqttPass">Unified Token/API Key:</label><input type="text" id="mqttPass" name="mqttPass"></div>
-<div class="form-row"><label for="sendInterval">Send Interval (ms):</label><input type="number" id="sendInterval" name="sendInterval"></div>
 
-<h3>Queue Settings</h3>
 <div class="form-row"><label for="queueMaxSize">Queue Max Size (bytes):</label><input type="number" id="queueMaxSize" name="queueMaxSize"></div>
 <div class="form-row"><label for="queueFlushInterval">Queue Flush Interval (ms):</label><input type="number" id="queueFlushInterval" name="queueFlushInterval"></div>
 
+<h3>IV. Timing & Power</h3>
+<div class="form-row"><label for="sendInterval">Send Interval (ms):</label><input type="number" id="sendInterval" name="sendInterval"></div>
+<div class="form-row"><label for="ntpServer">NTP Server:</label><input type="text" id="ntpServer" name="ntpServer"></div>
+<div class="form-row"><label for="timeZone">Time Zone (UTC Offset):</label><input type="number" id="timeZone" name="timeZone"></div>
+<div class="form-row"><label for="enableSleep">Enable Deep Sleep:</label><input type="checkbox" id="enableSleep" name="enableSleep"></div>
+<div class="form-row"><label for="sleepDuration">Sleep Duration (seconds):</label><input type="number" id="sleepDuration" name="sleepDuration"></div>
 
-<h3>Sensor Pinout & Calibration</h3>
+
+<h3>V. Sensor Pinout & Enable/Disable</h3>
 <div class="form-row">
   <label for="autoCalibrateOnBoot">Auto Calibrate on Boot:</label>
   <input type="checkbox" id="autoCalibrateOnBoot" name="autoCalibrateOnBoot">
 </div>
 
-<div class="form-row"><label for="dustLEDPin">Dust LED Pin:</label><input type="number" id="dustLEDPin" name="dustLEDPin"></div>
-<div class="form-row"><label for="dustADCPin">Dust ADC Pin:</label><input type="number" id="dustADCPin" name="dustADCPin"></div>
+<h4>Pinout</h4>
+<div class="form-row"><label for="dustLEDPin">Dust LED Pin (GP2Y):</label><input type="number" id="dustLEDPin" name="dustLEDPin"></div>
+<div class="form-row"><label for="dustADCPin">Dust ADC Pin (GP2Y):</label><input type="number" id="dustADCPin" name="dustADCPin"></div>
 <div class="form-row"><label for="mqADCPin">MQ ADC Pin:</label><input type="number" id="mqADCPin" name="mqADCPin"></div>
+
+<h4>PMS7003/PMSA003</h4>
+<div class="form-row">
+  <label for="pmsEnabled">Enable PMS Sensor:</label>
+  <input type="checkbox" id="pmsEnabled" name="pmsEnabled">
+</div>
+<div class="form-row"><label for="pmsRxPin">PMS RX Pin:</label><input type="number" id="pmsRxPin" name="pmsRxPin"></div>
+<div class="form-row"><label for="pmsTxPin">PMS TX Pin:</label><input type="number" id="pmsTxPin" name="pmsTxPin"></div>
+<div class="form-row"><label for="pmsSetPin">PMS Set Pin (-1 if unused):</label><input type="number" id="pmsSetPin" name="pmsSetPin"></div>
+
+
+<h3>VI. Sensor Calibration Values</h3>
+<h4>MQ Gas Sensor</h4>
 <div class="form-row"><label for="mq_rl_kohm">MQ RL (kOhm):</label><input type="number" step="0.01" id="mq_rl_kohm" name="mq_rl_kohm"></div>
-<div class="form-row"><label for="mq_r0_ratio_clean">MQ R0 ratio:</label><input type="number" step="0.001" id="mq_r0_ratio_clean" name="mq_r0_ratio_clean"></div>
-<div class="form-row"><label for="mq_rzero">MQ RZERO:</label><input type="number" step="0.01" id="mq_rzero" name="mq_rzero"></div>
-<div class="form-row"><label for="dust_baseline">Dust Baseline:</label><input type="number" step="0.0001" id="dust_baseline" name="dust_baseline"></div>
+<div class="form-row"><label for="mq_r0_ratio_clean">MQ R0/Rs ratio:</label><input type="number" step="0.001" id="mq_r0_ratio_clean" name="mq_r0_ratio_clean"></div>
+<div class="form-row"><label for="mq_rzero">MQ RZERO (Persisted R0):</label><input type="number" step="0.01" id="mq_rzero" name="mq_rzero" readonly></div>
+
+<h4>Dust Sensor</h4>
+<div class="form-row"><label for="dust_baseline">Dust Baseline (Persisted V):</label><input type="number" step="0.0001" id="dust_baseline" name="dust_baseline" readonly></div>
 <div class="form-row"><label for="dust_calibration">Dust calibration factor:</label><input type="number" step="0.0001" id="dust_calibration" name="dust_calibration"></div>
 
 <div class="btn-group">
@@ -103,7 +127,8 @@ for(const key in configData) {
             input.checked = configData[key] === true || configData[key] === "true";
         } else {
 
-			if (key === 'deviceId') {
+            // Special handling for read-only fields
+            if (key === 'deviceId' || key === 'mq_rzero' || key === 'dust_baseline') {
                 input.value = configData[key];
                 continue;
             }

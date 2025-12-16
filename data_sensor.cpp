@@ -1,10 +1,13 @@
-//data_sensor.cpp
+// File: data_sensor.cpp
+// Comprehensive AQI evaluation using available sensors
+// JSON structure preserved
+
 #include <Arduino.h>
 #include "data.h"
 #include "config.h"
 #include <ArduinoJson.h>
 #include "mq135.h"
-#include "RawPMS7003.h"
+#include "PMS7003.h"
 
 // =====================================================================
 // Global instances
@@ -16,7 +19,7 @@ bool bmeInitialized = false;
 
 extern float dust_baseline;
 
-RawPMS7003* pms7003 = nullptr;
+PMS7003* pms7003 = nullptr;
 bool pmsInitialized = false;
 
 // =====================================================================
@@ -35,12 +38,13 @@ uint64_t nowMicros() {
 }
 
 // =====================================================================
-// AQI PM2.5
+// AQI helpers
 // =====================================================================
 static int linAQI(float Cp, float Cl, float Ch, int Il, int Ih) {
   return (int)roundf((Ih - Il) / (Ch - Cl) * (Cp - Cl) + Il);
 }
 
+// PM2.5 AQI (EPA)
 int calcAQI_PM25(float pm) {
   if (pm < 0 || !isfinite(pm)) return -1;
   if (pm <= 12.0f) return linAQI(pm, 0.0f, 12.0f, 0, 50);
@@ -51,23 +55,52 @@ int calcAQI_PM25(float pm) {
   if (pm <= 350.4f) return linAQI(pm, 250.5f, 350.4f, 301, 400);
   return linAQI(pm, 350.5f, 500.4f, 401, 500);
 }
+
+// PM10 AQI (EPA)
+int calcAQI_PM10(float pm10) {
+  if (pm10 < 0 || !isfinite(pm10)) return -1;
+  if (pm10 <= 54) return linAQI(pm10, 0, 54, 0, 50);
+  if (pm10 <= 154) return linAQI(pm10, 55, 154, 51, 100);
+  if (pm10 <= 254) return linAQI(pm10, 155, 254, 101, 150);
+  if (pm10 <= 354) return linAQI(pm10, 255, 354, 151, 200);
+  if (pm10 <= 424) return linAQI(pm10, 355, 424, 201, 300);
+  return linAQI(pm10, 425, 604, 301, 500);
+}
+
+// MQ135 qualitative VOC impact (heuristic)
+int calcAQI_VOC(float idx) {
+  if (!isfinite(idx)) return -1;
+  if (idx < 100) return 25;
+  if (idx < 200) return 75;
+  if (idx < 300) return 125;
+  if (idx < 400) return 175;
+  return 250;
+}
+
 // =====================================================================
 // Init PMS7003 Sensor
 // =====================================================================
 void initPMS7003() {
   if (pmsInitialized) return;
 
-  pms7003 = new RawPMS7003(
-    Serial2,
+  Serial2.begin(9600, SERIAL_8N1,
+                appConfig.pmsRxPin,
+                appConfig.pmsTxPin);
+
+  if (appConfig.pmsSetPin >= 0) {
+    pms7003 = new PMS7003(Serial2, appConfig.pmsSetPin, -1);
+  } else {
+    pms7003 = new PMS7003(Serial2);
+  }
+
+  pms7003->begin();
+  pmsInitialized = true;
+
+  addLogf(
+    "[PMS7003] Initialized RX=%d TX=%d SET=%d",
     appConfig.pmsRxPin,
     appConfig.pmsTxPin,
     appConfig.pmsSetPin);
-
-  pms7003->begin();
-
-  pmsInitialized = true;
-  addLogf("[PMS7003] Initialized on RX:%d, TX:%d, SET:%d (9600 baud)",
-          appConfig.pmsRxPin, appConfig.pmsTxPin, appConfig.pmsSetPin);
 }
 
 // =====================================================================
@@ -91,7 +124,7 @@ void initMQ135() {
 }
 
 // =====================================================================
-// Init Dust Sensor
+// Init GP2Y Dust Sensor
 // =====================================================================
 void initDustSensor() {
   if (gp2ySensor) return;
@@ -100,19 +133,19 @@ void initDustSensor() {
                                   appConfig.dustADCPin);
   gp2ySensor->begin();
 
+  addLogf(
+    "[INIT] GP2Y LED=%d ADC=%d",
+    appConfig.dustLEDPin,
+    appConfig.dustADCPin);
+
   if (isfinite(appConfig.dust_baseline) && appConfig.dust_baseline > 0.0f) {
     gp2ySensor->setBaseline(appConfig.dust_baseline);
-
-    addLogf("[gp2ySensor] Using saved baseline=%.4f", appConfig.dust_baseline);
-  } else {
-    addLog("[gp2ySensor] No saved baseline, will calibrate if needed");
+    addLogf("[GP2Y] Using baseline=%.4f", appConfig.dust_baseline);
   }
 
   if (isfinite(appConfig.dust_calibration) && appConfig.dust_calibration > 0.0f) {
     gp2ySensor->setCalibrationFactor(appConfig.dust_calibration);
-    addLogf("[gp2ySensor] Using saved CalibrationFactor=%4f", appConfig.dust_calibration);
-  } else {
-    addLog("[gp2ySensor] No saved CalibrationFactor, will calibrate if needed");
+    addLogf("[GP2Y] Using calibration=%.4f", appConfig.dust_calibration);
   }
 }
 
@@ -120,7 +153,9 @@ void initDustSensor() {
 // JSON generator for MQTT
 // =====================================================================
 String getDataJson() {
-  // --- 1. Read BME280 ---
+  // -------------------------------------------------------------------
+  // 1. BME280
+  // -------------------------------------------------------------------
   float t = NAN, h = NAN, p = NAN;
 
   if (bmeInitialized) {
@@ -129,51 +164,54 @@ String getDataJson() {
     p = safeRound(bme.readPressure() / 100.0f, 1);
   }
 
-  // --- 2. Read PMS7003 ---
-  uint16_t pms_pm25_read = 0;
-  int pms_aqi = -1;
-  String pms_log_status = "N/A";
-  bool pms_read_ok = false;
+  // -------------------------------------------------------------------
+  // 2. PMS7003
+  // -------------------------------------------------------------------
+  PMS7003_Data pmsData;
+  bool pms_ok = false;
+  uint16_t pms_pm25 = 0;
+  uint16_t pms_pm10 = 0;
 
-  if (pmsInitialized && pms7003) {
-    if (pms7003->read()) {
-      pms_read_ok = pms7003->is_valid;
-      if (pms_read_ok) {
-        pms_pm25_read = pms7003->data.pm2_5_std;
-        pms_aqi = calcAQI_PM25((float)pms_pm25_read);
-        pms_log_status = String("OK, PM2.5 Std=") + String(pms_pm25_read);
-      } else {
-        pms_log_status = String("Protocol Error:") + String(pms7003->status_code);
-      }
-    } else {
-      pms_log_status = String("Read Failed, Status:") + String(pms7003->status_code);
+  if (pmsInitialized && pms7003 && pms7003->read(pmsData)) {
+    pms_ok = true;
+    pms_pm25 = pmsData.pm2_5_atm;
+    pms_pm10 = pmsData.pm10_atm;
+  }
+
+  // -------------------------------------------------------------------
+  // 3. GP2Y
+  // -------------------------------------------------------------------
+  uint16_t gp2y_pm = gp2ySensor ? gp2ySensor->getDustDensity() : 0;
+
+  // -------------------------------------------------------------------
+  // 4. MQ135
+  // -------------------------------------------------------------------
+  float mqIndex = NAN;
+  if (mq135 && isfinite(t) && isfinite(h)) {
+    mqIndex = safeRound(mq135->getCorrectedIndex(t, h), 0);
+  }
+
+  // -------------------------------------------------------------------
+  // AQI comprehensive evaluation
+  // -------------------------------------------------------------------
+  int aqi_pm25_pms = pms_ok ? calcAQI_PM25(pms_pm25) : -1;
+  int aqi_pm25_gp2y = gp2ySensor ? calcAQI_PM25(gp2y_pm) : -1;
+  int aqi_pm10 = pms_ok ? calcAQI_PM10(pms_pm10) : -1;
+  int aqi_voc = isfinite(mqIndex) ? calcAQI_VOC(mqIndex) : -1;
+
+  int final_aqi = -1;
+  int aqi_list[] = { aqi_pm25_pms, aqi_pm25_gp2y, aqi_pm10, aqi_voc };
+  for (int i = 0; i < 4; i++) {
+    if (aqi_list[i] >= 0 && (final_aqi < 0 || aqi_list[i] > final_aqi)) {
+      final_aqi = aqi_list[i];
     }
   }
 
-  // --- 3. Read GP2Y ---
-  uint16_t gp2y_pm = 0;
-  int gp2y_aqi = -1;
-
-  if (gp2ySensor) {
-    gp2y_pm = gp2ySensor->getDustDensity();
-    gp2y_aqi = calcAQI_PM25(gp2y_pm);
-  }
-
-  // --- Determine PM and AQI for the simplified JSON ---
-  uint16_t final_pm = pms_read_ok ? pms_pm25_read : gp2y_pm;
-  int final_aqi = pms_read_ok ? pms_aqi : gp2y_aqi;
-
-  // --- 4. Read MQ135 ---
-  float mqIndex = NAN;
-  if (mq135 && isfinite(t) && isfinite(h)) {
-    mqIndex = mq135->getCorrectedIndex(t, h);
-    mqIndex = safeRound(mqIndex, 0);
-  }
-
+  uint16_t final_pm = pms_ok ? pms_pm25 : gp2y_pm;
   uint64_t ts = nowMicros();
 
   // =================================================================
-  // JSON Output
+  // JSON Output (structure preserved)
   // =================================================================
   StaticJsonDocument<512> doc;
 
@@ -182,52 +220,60 @@ String getDataJson() {
   if (isfinite(h)) doc["h"] = h;
   if (isfinite(p)) doc["p"] = p;
 
+  // --- DỮ LIỆU ĐỘC LẬP TỪ CẢM BIẾN BỤI VÀ AQI RIÊNG ---
+
+  // 1. PMS7003 (PM2.5 và PM10)
+  if (pms_ok) {
+    doc["pm25_pms"] = pms_pm25;
+    doc["pm10_pms"] = pms_pm10;
+    // AQI PM2.5 từ PMS7003
+    if (aqi_pm25_pms >= 0) doc["aqi_pms25"] = aqi_pm25_pms;
+    // AQI PM10 từ PMS7003
+    if (aqi_pm10 >= 0) doc["aqi_pms10"] = aqi_pm10;
+  }
+
+  // 2. GP2Y (PM2.5)
+  if (gp2ySensor) {
+    doc["pm25_gp2y"] = gp2y_pm;
+    // AQI PM2.5 từ GP2Y
+    if (aqi_pm25_gp2y >= 0) doc["aqi_gp2y25"] = aqi_pm25_gp2y;
+  }
+
+  // 3. MQ135 (VOC/Khí độc)
+  if (isfinite(mqIndex)) {
+    doc["mq"] = mqIndex;
+    // AQI VOC từ MQ135
+    if (aqi_voc >= 0) doc["aqi_voc"] = aqi_voc;
+  }
+
+  // --- DỮ LIỆU TỔNG HỢP (Giữ nguyên) ---
+
   doc["pm"] = final_pm;
-  if (final_aqi != -1) doc["aqi"] = final_aqi;
-  if (isfinite(mqIndex)) doc["mq"] = mqIndex;
+  if (final_aqi >= 0) doc["aqi"] = final_aqi;  // Vẫn là AQI cao nhất
 
   doc["ts"] = ts;
 
   String json;
   serializeJson(doc, json);
 
-
-
-#define PMS_LOG_BUFFER_SIZE 1024
-  char pms_detail_buffer[PMS_LOG_BUFFER_SIZE] = "";
-
-  if (pms_read_ok) {
-
-    snprintf(
-      pms_detail_buffer,
-      PMS_LOG_BUFFER_SIZE,
-      " | "
-      "PMS7003_MASS{PM1.0_Std=%u, PM2.5_Std=%u, PM10_Std=%u (USED_AQI)} | "
-      "PMS7003_MASS_ATM{PM1.0_Atm=%u, PM2.5_Atm=%u, PM10_Atm=%u (NOT_USED_AQI)} | "
-      "PMS7003_PARTICLE_COUNT{PC_0.3um=%u, PC_2.5um=%u, PC_10um=%u}",
-      pms7003->data.pm1_0_std, pms7003->data.pm2_5_std, pms7003->data.pm10_0_std,
-      pms7003->data.pm1_0_atm, pms7003->data.pm2_5_atm, pms7003->data.pm10_0_atm,
-      pms7003->data.count_0_3um, pms7003->data.count_2_5um, pms7003->data.count_10_0um);
-  } else {
-
-    pms_detail_buffer[0] = '\0';
-  }
-
-
+  // =================================================================
+  // Detailed log
+  // =================================================================
   addLogf(
     "[DATA] "
-    "BME280{T=%.1f C, H=%.1f %%, P=%.1f hPa} | "
-    "PMS7003{PM2.5_Std= %u ug/m3, Status=%s} | "
-    "GP2Y{PM2.5_Eq=%u ug/m3, AQI_GP2Y=%d} | "
-    "MQ135{AQI_MQ135=%.0f} | "
-    "FinalSource=%s"
-    "%s",
+    "BME{T=%.1fC H=%.1f%% P=%.1fhPa} | "
+    "PMS7003{OK=%d PM2.5=%u PM10=%u AQI25=%d AQI10=%d} | "
+    "GP2Y{PM=%u AQI=%d} | "
+    "MQ135{IDX=%.0f AQI=%d} | "
+    "FINAL{PM=%u AQI=%d SRC=%s}",
     t, h, p,
-    pms_pm25_read, pms_log_status.c_str(),
-    gp2y_pm, gp2y_aqi,
-    mqIndex,
-    pms_read_ok ? "PMS7003_SENSOR" : "GP2Y_SENSOR",
-    pms_detail_buffer);
+    pms_ok,
+    pms_pm25, pms_pm10,
+    aqi_pm25_pms, aqi_pm10,
+    gp2y_pm, aqi_pm25_gp2y,
+    mqIndex, aqi_voc,
+    final_pm, final_aqi,
+    pms_ok ? "PMS7003" : "GP2Y");
 
   return json;
 }

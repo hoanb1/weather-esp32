@@ -7,7 +7,8 @@
 #include <PubSubClient.h>
 #include <Adafruit_BME280.h>
 #include <GP2YDustSensor.h>
-#include "RawPMS7003.h"
+#include "PMS7003.h"
+
 #include "mq135.h"
 #include "config.h"
 
@@ -29,7 +30,8 @@ extern bool isWifiConnected;
 extern bool bmeInitialized;
 
 // --- PMS7003 ---
-extern RawPMS7003* pms7003;
+extern PMS7003* pms7003;
+
 extern bool pmsInitialized;
 
 

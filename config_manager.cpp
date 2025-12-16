@@ -17,43 +17,50 @@ uint8_t logIndex = 0;
 
 // --- Default Config ---
 const AppConfig_t defaultConfig = {
-  .wifiSSID = "HH-1301",
-  .wifiPass = "tutulala",
-
-  .mqttServer = "pi.hoan.uk",
-  .mqttPort = 1883,
-  .mqttUser = "sensor",
-  .mqttPass = "4f9605ca60ceeff2",
-  .mqttEnabled = true,
-
-  .queueMaxSize = 200 * 1024,  // 200 KB default
-  .queueFlushInterval = 5000,  // try sending every 5s
-
-  .sendInterval = 5000,
-  .ntpServer = "pool.ntp.org",
-
-  .dustLEDPin = 15,
-  .dustADCPin = 35,
-  .mqADCPin = 34,
-
-  .pmsRxPin = 17,
-  .pmsTxPin = 16,
-  .pmsSetPin = -1,
-
-  .mq_rl_kohm = 1.0,
-  .mq_r0_ratio_clean = 3.6,
-  .mq_rzero = 0,
-  .dust_baseline = 0,
-  .dust_calibration = 1,
-
-  .autoCalibrateOnBoot = true,
-
-
+  // I. GENERAL & DEVICE INFO
   .deviceId = 0,
   .latitude = 21.5,
   .longitude = 105.8,
   .stationName = "My Home Weather Station",
   .stationDescription = "ESP32 Air Quality Sensor",
+
+  // II. NETWORK & WIFI
+  .wifiSSID = "HH-1301",
+  .wifiPass = "tutulala",
+
+  // III. MQTT & DATA SERVICE
+  .mqttEnabled = true,
+  .mqttServer = "pi.hoan.uk",
+  .mqttPort = 1883,
+  .mqttPass = "74c3434e70d23c25", // Unified Token
+  .queueMaxSize = 200 * 1024,  // 200 KB default
+  .queueFlushInterval = 5000,  // try sending every 5s
+
+  // IV. TIMING & POWER
+  .sendInterval = 5000,
+  .ntpServer = "pool.ntp.org",
+  .timeZone = 7,               // UTC+7 (Vietnam time)
+  .enableSleep = false,
+  .sleepDuration = 300,        // 5 minutes sleep if enabled
+
+  // V. SENSOR PINS & CONFIG
+  .dustLEDPin = 15,
+  .dustADCPin = 35,
+  .mqADCPin = 34,
+
+  .pmsEnabled = true,
+  .pmsRxPin = 17,
+  .pmsTxPin = 16,
+  .pmsSetPin = -1, // No control pin by default
+
+  // VI. SENSOR CALIBRATION & OFFSET
+  .mq_rl_kohm = 1.0,
+  .mq_r0_ratio_clean = 3.6,
+  .mq_rzero = 10,
+  .dust_baseline = 0.6,
+  .dust_calibration = 1.0f,
+
+  .autoCalibrateOnBoot = true,
 };
 
 // --- Reset config to defaults ---

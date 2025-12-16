@@ -262,39 +262,57 @@ void setupWebServer() {
 
   // Settings
   server.on("/settings", HTTP_GET, [](AsyncWebServerRequest *request) {
-    StaticJsonDocument<512> doc;
+    StaticJsonDocument<768> doc;
+
+    // I. GENERAL & DEVICE INFO
     doc["deviceId"] = appConfig.deviceId;
     doc["latitude"] = appConfig.latitude;
     doc["longitude"] = appConfig.longitude;
     doc["stationName"] = appConfig.stationName;
     doc["stationDescription"] = appConfig.stationDescription;
 
+    // II. NETWORK & WIFI
     doc["wifiSSID"] = appConfig.wifiSSID;
     doc["wifiPass"] = appConfig.wifiPass;
+
+    // III. MQTT & DATA SERVICE
+    doc["mqttEnabled"] = appConfig.mqttEnabled;
     doc["mqttServer"] = appConfig.mqttServer;
     doc["mqttPort"] = appConfig.mqttPort;
-    doc["mqttUser"] = appConfig.mqttUser;
+    // doc["mqttUser"] = appConfig.mqttUser; // Removed
     doc["mqttPass"] = appConfig.mqttPass;
-
-    doc["mqttEnabled"] = appConfig.mqttEnabled;
 
     doc["queueMaxSize"] = appConfig.queueMaxSize;
     doc["queueFlushInterval"] = appConfig.queueFlushInterval;
 
-
+    // IV. TIMING & POWER
     doc["sendInterval"] = appConfig.sendInterval;
     doc["ntpServer"] = appConfig.ntpServer;
+    doc["timeZone"] = appConfig.timeZone;
+    doc["enableSleep"] = appConfig.enableSleep;
+    doc["sleepDuration"] = appConfig.sleepDuration;
+
+
+    // V. SENSOR PINS & CONFIG
     doc["dustLEDPin"] = appConfig.dustLEDPin;
     doc["dustADCPin"] = appConfig.dustADCPin;
     doc["mqADCPin"] = appConfig.mqADCPin;
+
+    doc["pmsEnabled"] = appConfig.pmsEnabled;
+    doc["pmsRxPin"] = appConfig.pmsRxPin;
+    doc["pmsTxPin"] = appConfig.pmsTxPin;
+    doc["pmsSetPin"] = appConfig.pmsSetPin;
+
+
+    // VI. SENSOR CALIBRATION & OFFSET
+    doc["autoCalibrateOnBoot"] = appConfig.autoCalibrateOnBoot;
+
     doc["mq_rl_kohm"] = appConfig.mq_rl_kohm;
     doc["mq_r0_ratio_clean"] = appConfig.mq_r0_ratio_clean;
+    doc["mq_rzero"] = appConfig.mq_rzero; // Persisted state (Read-only on form)
 
-    doc["mq_rzero"] = appConfig.mq_rzero;
-    doc["dust_baseline"] = appConfig.dust_baseline;
+    doc["dust_baseline"] = appConfig.dust_baseline; // Persisted state (Read-only on form)
     doc["dust_calibration"] = appConfig.dust_calibration;
-
-    doc["autoCalibrateOnBoot"] = appConfig.autoCalibrateOnBoot;
 
 
     String jsonConfig;
@@ -312,13 +330,14 @@ void setupWebServer() {
   server.on(
     "/save", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-      StaticJsonDocument<512> doc;
+      StaticJsonDocument<768> doc;
       DeserializationError error = deserializeJson(doc, (const char *)data, len);
       if (error) {
         request->send(400, "text/plain", "Invalid JSON");
         return;
       }
 
+      // I. GENERAL & DEVICE INFO
 	  if (doc.containsKey("deviceId")) appConfig.deviceId = doc["deviceId"].as<uint32_t>();
       if (doc.containsKey("latitude")) appConfig.latitude = doc["latitude"].as<float>();
       if (doc.containsKey("longitude")) appConfig.longitude = doc["longitude"].as<float>();
@@ -326,34 +345,48 @@ void setupWebServer() {
       if (doc.containsKey("stationName")) strncpy(appConfig.stationName, doc["stationName"], sizeof(appConfig.stationName));
       if (doc.containsKey("stationDescription")) strncpy(appConfig.stationDescription, doc["stationDescription"], sizeof(appConfig.stationDescription));
 
+      // II. NETWORK & WIFI
       if (doc.containsKey("wifiSSID")) strncpy(appConfig.wifiSSID, doc["wifiSSID"], sizeof(appConfig.wifiSSID));
       if (doc.containsKey("wifiPass")) strncpy(appConfig.wifiPass, doc["wifiPass"], sizeof(appConfig.wifiPass));
+
+      // III. MQTT & DATA SERVICE
+      if (doc.containsKey("mqttEnabled")) appConfig.mqttEnabled = doc["mqttEnabled"].as<bool>();
       if (doc.containsKey("mqttServer")) strncpy(appConfig.mqttServer, doc["mqttServer"], sizeof(appConfig.mqttServer));
       if (doc.containsKey("mqttPort")) appConfig.mqttPort = doc["mqttPort"].as<uint16_t>();
-      if (doc.containsKey("mqttUser")) strncpy(appConfig.mqttUser, doc["mqttUser"], sizeof(appConfig.mqttUser));
+      // if (doc.containsKey("mqttUser")) strncpy(appConfig.mqttUser, doc["mqttUser"], sizeof(appConfig.mqttUser)); // Removed
       if (doc.containsKey("mqttPass")) strncpy(appConfig.mqttPass, doc["mqttPass"], sizeof(appConfig.mqttPass));
-
-      if (doc.containsKey("mqttEnabled")) appConfig.mqttEnabled = doc["mqttEnabled"].as<bool>();
-
       if (doc.containsKey("queueMaxSize")) appConfig.queueMaxSize = doc["queueMaxSize"].as<uint32_t>();
       if (doc.containsKey("queueFlushInterval")) appConfig.queueFlushInterval = doc["queueFlushInterval"].as<uint16_t>();
 
 
+      // IV. TIMING & POWER
       if (doc.containsKey("sendInterval")) appConfig.sendInterval = doc["sendInterval"].as<uint32_t>();
       if (doc.containsKey("ntpServer")) strncpy(appConfig.ntpServer, doc["ntpServer"], sizeof(appConfig.ntpServer));
-      if (doc.containsKey("mq_rl_kohm")) appConfig.mq_rl_kohm = doc["mq_rl_kohm"].as<float>();
-      if (doc.containsKey("mq_r0_ratio_clean")) appConfig.mq_r0_ratio_clean = doc["mq_r0_ratio_clean"].as<float>();
-      if (doc.containsKey("mq_rzero")) appConfig.mq_rzero = doc["mq_rzero"].as<float>();
-      if (doc.containsKey("dust_baseline")) appConfig.dust_baseline = doc["dust_baseline"].as<float>();
-      if (doc.containsKey("dust_calibration")) appConfig.dust_calibration = doc["dust_calibration"].as<float>();
-
-      if (doc.containsKey("autoCalibrateOnBoot")) appConfig.autoCalibrateOnBoot = doc["autoCalibrateOnBoot"].as<bool>();
+      if (doc.containsKey("timeZone")) appConfig.timeZone = doc["timeZone"].as<int>();
+      if (doc.containsKey("enableSleep")) appConfig.enableSleep = doc["enableSleep"].as<bool>();
+      if (doc.containsKey("sleepDuration")) appConfig.sleepDuration = doc["sleepDuration"].as<uint32_t>();
 
 
+      // V. SENSOR PINS & CONFIG
       if (doc.containsKey("dustLEDPin")) appConfig.dustLEDPin = doc["dustLEDPin"].as<uint8_t>();
       if (doc.containsKey("dustADCPin")) appConfig.dustADCPin = doc["dustADCPin"].as<uint8_t>();
       if (doc.containsKey("mqADCPin")) appConfig.mqADCPin = doc["mqADCPin"].as<uint8_t>();
 
+      if (doc.containsKey("pmsEnabled")) appConfig.pmsEnabled = doc["pmsEnabled"].as<bool>();
+      if (doc.containsKey("pmsRxPin")) appConfig.pmsRxPin = doc["pmsRxPin"].as<uint8_t>();
+      if (doc.containsKey("pmsTxPin")) appConfig.pmsTxPin = doc["pmsTxPin"].as<uint8_t>();
+      if (doc.containsKey("pmsSetPin")) appConfig.pmsSetPin = doc["pmsSetPin"].as<int>();
+
+
+      // VI. SENSOR CALIBRATION & OFFSET
+      if (doc.containsKey("autoCalibrateOnBoot")) appConfig.autoCalibrateOnBoot = doc["autoCalibrateOnBoot"].as<bool>();
+
+      if (doc.containsKey("mq_rl_kohm")) appConfig.mq_rl_kohm = doc["mq_rl_kohm"].as<float>();
+      if (doc.containsKey("mq_r0_ratio_clean")) appConfig.mq_r0_ratio_clean = doc["mq_r0_ratio_clean"].as<float>();
+      // mq_rzero is persisted, not usually changed from form
+
+      if (doc.containsKey("dust_calibration")) appConfig.dust_calibration = doc["dust_calibration"].as<float>();
+      // dust_baseline is persisted, not usually changed from form
 
 
       saveConfig();
