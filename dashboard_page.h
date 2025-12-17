@@ -131,13 +131,6 @@ body {
     /* Add subtle separator line below each tile/column for flat separation */
     border-bottom: 1px solid var(--color-line-separator);
 }
-/* Ensure the last row doesn't have the bottom separator or if easier, handle it via parent container */
-/* A grid-based approach often means styling individual items */
-/* Example: Targetting elements that are not in the last row (requires knowing the grid setup)
-.data-grid:last-child .data-tile { border-bottom: none; }
-For simplicity, we leave the separator on all tiles or use a different separator approach.
-Here, we keep it simple: separated by background and line.
-*/
 
 .data-tile:hover {
     box-shadow: none; /* NO HOVER SHADOW */
@@ -231,6 +224,24 @@ Here, we keep it simple: separated by background and line.
     white-space: pre-wrap;
     margin: 0;
 }
+/* ===== COMBINED CHART ROW (LAST 2 CHARTS) ===== */
+.combined-chart-tile {
+    grid-column: span 1;
+}
+
+.combined-row {
+    grid-column: 1 / -1;
+    display: grid;
+	min-height: 380px;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+@media (max-width: 600px) {
+    .combined-row {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 </head>
 <body>
@@ -305,16 +316,19 @@ Here, we keep it simple: separated by background and line.
   <div id="chartMQ" class="chart-container"></div>
 </div>
 
+<!-- ===== LAST ROW: 2 CHARTS FULL WIDTH ===== -->
+<div class="combined-row">
+
 <div class="data-tile combined-chart-tile">
   <h4 class="tile-header">Particulate Matter (µg/m³) Comparison</h4>
-  <div id="chartParticulateMatter" class="chart-container" style="min-height: 300px;"></div>
+  <div id="chartParticulateMatter" class="chart-container" ></div>
 </div>
 
 <div class="data-tile combined-chart-tile">
   <h4 class="tile-header">AQI Comparison</h4>
-  <div id="chartAQIComparison" class="chart-container" style="min-height: 300px;"></div>
+  <div id="chartAQIComparison" class="chart-container" ></div>
 </div>
-
+</div>
 </section>
 
 <div class="log-panel">

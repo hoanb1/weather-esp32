@@ -322,7 +322,27 @@ function loadTimeRange() {
         if (val) document.getElementById('timeRangeSelect').value = val;
     } catch (e) {}
 }
+function normalizeTimestampToMs(ts) {
+    if (typeof ts !== "number" || ts <= 0) return null;
 
+    // seconds
+    if (ts < 1e11) {
+        return Math.floor(ts * 1000);
+    }
+
+    // milliseconds
+    if (ts < 1e14) {
+        return Math.floor(ts);
+    }
+
+    // microseconds
+    if (ts < 1e17) {
+        return Math.floor(ts / 1_000);
+    }
+
+    // nanoseconds
+    return Math.floor(ts / 1_000_000);
+}
 // --- WebSocket (Data processing section updated for new arrays) ---
 
 function connectWS(){
@@ -342,16 +362,13 @@ function connectWS(){
     let d;
     try { d = JSON.parse(e.data); } catch(err) { return; }
 
-   let ts = Date.now();   // fallback
+   let ts = Date.now();
 
-    if (d.ts !== undefined && typeof d.ts === "number" && d.ts > 0) {
+if (d.ts !== undefined) {
 
-        const ts_ms = Math.floor(d.ts / 1000);  // UTC ms
-      
+    const ts_ms = normalizeTimestampToMs(d.ts);
 
-        // convert UTC -> local
-        const local_ts = ts_ms + (new Date().getTimezoneOffset() * -60000);
-      
+    if (ts_ms !== null) {
 
         const now = Date.now();
 
@@ -359,14 +376,13 @@ function connectWS(){
         const maxPastDrift   = 24 * 60 * 60 * 1000;
 
         if (
-            local_ts > now - maxPastDrift &&
-            local_ts < now + maxFutureDrift
+            ts_ms > now - maxPastDrift &&
+            ts_ms < now + maxFutureDrift
         ) {
-            ts = local_ts;
-        } 
-    } 
-
-
+            ts = ts_ms;
+        }
+    }
+}
 
     let isNewData = false;
 

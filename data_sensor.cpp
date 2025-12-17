@@ -199,12 +199,17 @@ String getDataJson() {
   int aqi_pm10 = pms_ok ? calcAQI_PM10(pms_pm10) : -1;
   int aqi_voc = isfinite(mqIndex) ? calcAQI_VOC(mqIndex) : -1;
 
+
   int final_aqi = -1;
-  int aqi_list[] = { aqi_pm25_pms, aqi_pm25_gp2y, aqi_pm10, aqi_voc };
-  for (int i = 0; i < 4; i++) {
-    if (aqi_list[i] >= 0 && (final_aqi < 0 || aqi_list[i] > final_aqi)) {
-      final_aqi = aqi_list[i];
-    }
+
+  if (aqi_pm25_pms >= 0) {
+    final_aqi = aqi_pm25_pms;
+  } else if (aqi_pm25_gp2y >= 0) {
+    final_aqi = aqi_pm25_gp2y;
+  } else if (aqi_pm10 >= 0) {
+    final_aqi = aqi_pm10;
+  } else if (aqi_voc >= 0) {
+    final_aqi = aqi_voc;
   }
 
   uint16_t final_pm = pms_ok ? pms_pm25 : gp2y_pm;
@@ -220,37 +225,25 @@ String getDataJson() {
   if (isfinite(h)) doc["h"] = h;
   if (isfinite(p)) doc["p"] = p;
 
-  // --- DỮ LIỆU ĐỘC LẬP TỪ CẢM BIẾN BỤI VÀ AQI RIÊNG ---
-
-  // 1. PMS7003 (PM2.5 và PM10)
   if (pms_ok) {
     doc["pm25_pms"] = pms_pm25;
     doc["pm10_pms"] = pms_pm10;
-    // AQI PM2.5 từ PMS7003
     if (aqi_pm25_pms >= 0) doc["aqi_pms25"] = aqi_pm25_pms;
-    // AQI PM10 từ PMS7003
     if (aqi_pm10 >= 0) doc["aqi_pms10"] = aqi_pm10;
   }
 
-  // 2. GP2Y (PM2.5)
   if (gp2ySensor) {
     doc["pm25_gp2y"] = gp2y_pm;
-    // AQI PM2.5 từ GP2Y
     if (aqi_pm25_gp2y >= 0) doc["aqi_gp2y25"] = aqi_pm25_gp2y;
   }
 
-  // 3. MQ135 (VOC/Khí độc)
   if (isfinite(mqIndex)) {
     doc["mq"] = mqIndex;
-    // AQI VOC từ MQ135
     if (aqi_voc >= 0) doc["aqi_voc"] = aqi_voc;
   }
 
-  // --- DỮ LIỆU TỔNG HỢP (Giữ nguyên) ---
-
   doc["pm"] = final_pm;
-  if (final_aqi >= 0) doc["aqi"] = final_aqi;  // Vẫn là AQI cao nhất
-
+  if (final_aqi >= 0) doc["aqi"] = final_aqi;
   doc["ts"] = ts;
 
   String json;
@@ -260,20 +253,15 @@ String getDataJson() {
   // Detailed log
   // =================================================================
   addLogf(
-    "[DATA] "
-    "BME{T=%.1fC H=%.1f%% P=%.1fhPa} | "
-    "PMS7003{OK=%d PM2.5=%u PM10=%u AQI25=%d AQI10=%d} | "
-    "GP2Y{PM=%u AQI=%d} | "
-    "MQ135{IDX=%.0f AQI=%d} | "
-    "FINAL{PM=%u AQI=%d SRC=%s}",
-    t, h, p,
-    pms_ok,
+    "[DATA] BME{T=%.1fC H=%.1f%%} | "
+    "PMS{PM2.5=%u PM10=%u} | "
+    "Particles{>0.3um:%u, >0.5um:%u, >1.0um:%u, >2.5um:%u, >5.0um:%u, >10um:%u} | "
+    "AQI=%d SRC=%s",
+    t, h,
     pms_pm25, pms_pm10,
-    aqi_pm25_pms, aqi_pm10,
-    gp2y_pm, aqi_pm25_gp2y,
-    mqIndex, aqi_voc,
-    final_pm, final_aqi,
-    pms_ok ? "PMS7003" : "GP2Y");
+    pmsData.particles_03um, pmsData.particles_05um, pmsData.particles_10um,
+    pmsData.particles_25um, pmsData.particles_50um, pmsData.particles_100um,
+    final_aqi, pms_ok ? "PMS7003" : "GP2Y");
 
   return json;
 }
